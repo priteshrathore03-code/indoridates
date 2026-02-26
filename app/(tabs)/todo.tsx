@@ -9,10 +9,12 @@ import {
   View,
 } from "react-native";
 import {
+  addPlan,
+  deletePlan,
   getAllPlans,
   PlanStatus,
   PlanType,
-  updatePlans,
+  updatePlan,
 } from "../../data/planStore";
 import { useUserProfile } from "../../data/userProfile";
 import FadeWrapper from "../components/FadeWrapper";
@@ -20,8 +22,7 @@ import IndoreBackground from "../components/IndoreBackground";
 
 export default function Todo() {
   const router = useRouter();
-  const profile = useUserProfile();
-  const user = profile?.user;
+  const { user } = useUserProfile();
 
   const [plans, setPlans] = useState<PlanType[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -37,7 +38,7 @@ export default function Todo() {
 
   const loadPlans = async () => {
     const data = await getAllPlans();
-    setPlans(data || []);
+    setPlans(data);
   };
 
   if (!user) return null;
@@ -45,86 +46,73 @@ export default function Todo() {
   const isFemale = user.gender === "female";
   const isMale = user.gender === "male";
 
+  const resetForm = () => {
+    setTitle("");
+    setTime("");
+    setBrief("");
+    setEditingId(null);
+    setShowForm(false);
+  };
+
   const handleSave = async () => {
     if (!title || !time || !brief) return;
 
-    let updatedPlans: PlanType[];
-
     if (editingId) {
-      updatedPlans = plans.map((p) =>
-        p.id === editingId ? { ...p, title, time, brief } : p,
-      );
+      await updatePlan(editingId, { title, time, brief });
     } else {
       const newPlan: PlanType = {
-        id: Date.now().toString(),
         title,
         time,
         brief,
-        createdBy: user.phone,
+        createdBy: user.uid,
         createdByName: user.name || "User",
         requests: [],
         accepted: "",
         status: "open",
         createdAt: Date.now(),
       };
-
-      updatedPlans = [...plans, newPlan];
+      await addPlan(newPlan);
     }
 
-    setPlans(updatedPlans);
-    await updatePlans(updatedPlans);
-
-    setShowForm(false);
-    setEditingId(null);
-    setTitle("");
-    setTime("");
-    setBrief("");
+    await loadPlans();
+    resetForm();
   };
 
   const handleDelete = async (id: string) => {
-    const updated = plans.filter((p) => p.id !== id);
-    setPlans(updated);
-    await updatePlans(updated);
+    await deletePlan(id);
+    await loadPlans();
   };
 
-  const handleInterested = async (planId: string) => {
-    const updated = plans.map((p) =>
-      p.id === planId && !p.requests.includes(user.phone)
-        ? { ...p, requests: [...p.requests, user.phone] }
-        : p,
-    );
+  const handleInterested = async (plan: PlanType) => {
+    if (!plan.id) return;
 
-    setPlans(updated);
-    await updatePlans(updated);
+    if (!plan.requests.includes(user.uid)) {
+      await updatePlan(plan.id, {
+        requests: [...plan.requests, user.uid],
+      });
+      await loadPlans();
+    }
   };
 
-  const handleAccept = async (planId: string, phone: string) => {
-    const updated = plans.map((p) =>
-      p.id === planId
-        ? {
-            ...p,
-            accepted: phone,
-            status: "matched" as PlanStatus,
-          }
-        : p,
-    );
+  const handleAccept = async (plan: PlanType, uid: string) => {
+    if (!plan.id) return;
 
-    setPlans(updated);
-    await updatePlans(updated);
+    await updatePlan(plan.id, {
+      accepted: uid,
+      status: "matched" as PlanStatus,
+    });
+
+    await loadPlans();
   };
 
-  const handleReject = async (planId: string, phone: string) => {
-    const updated = plans.map((p) =>
-      p.id === planId
-        ? {
-            ...p,
-            requests: p.requests.filter((r) => r !== phone),
-          }
-        : p,
-    );
+  const handleReject = async (plan: PlanType, uid: string) => {
+    if (!plan.id) return;
 
-    setPlans(updated);
-    await updatePlans(updated);
+    await updatePlan(plan.id, {
+      requests: plan.requests.filter((r) => r !== uid),
+    });
+
+    await loadPlans();
   };
 
   return (
@@ -174,7 +162,7 @@ export default function Todo() {
           )}
 
           {plans.map((plan) => {
-            const alreadyRequested = plan.requests.includes(user.phone);
+            const alreadyRequested = plan.requests.includes(user.uid);
 
             return (
               <View key={plan.id} style={styles.card}>
@@ -183,25 +171,12 @@ export default function Todo() {
                 <Text style={styles.time}>{plan.time}</Text>
                 <Text style={styles.brief}>{plan.brief}</Text>
 
-                {/* VIEW PROFILE BUTTON (Both sides) */}
-                <TouchableOpacity
-                  style={styles.viewBtn}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/profile",
-                    })
-                  }
-                >
-                  <Text style={styles.btnText}>View Profile</Text>
-                </TouchableOpacity>
-
-                {/* FEMALE OWNER CONTROLS */}
-                {isFemale && plan.createdBy === user.phone && (
+                {isFemale && plan.createdBy === user.uid && (
                   <>
                     <TouchableOpacity
                       style={styles.editBtn}
                       onPress={() => {
-                        setEditingId(plan.id);
+                        setEditingId(plan.id || null);
                         setTitle(plan.title);
                         setTime(plan.time);
                         setBrief(plan.brief);
@@ -213,26 +188,25 @@ export default function Todo() {
 
                     <TouchableOpacity
                       style={styles.deleteBtn}
-                      onPress={() => handleDelete(plan.id)}
+                      onPress={() => plan.id && handleDelete(plan.id)}
                     >
                       <Text style={styles.btnText}>Delete</Text>
                     </TouchableOpacity>
 
                     {plan.requests.map((req) => (
                       <View key={req} style={styles.requestBox}>
-                        {/* NUMBER HIDDEN */}
                         <Text style={{ color: "white" }}>New Request</Text>
 
                         <TouchableOpacity
                           style={styles.editBtn}
-                          onPress={() => handleAccept(plan.id, req)}
+                          onPress={() => handleAccept(plan, req)}
                         >
                           <Text style={styles.btnText}>Accept</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
                           style={styles.deleteBtn}
-                          onPress={() => handleReject(plan.id, req)}
+                          onPress={() => handleReject(plan, req)}
                         >
                           <Text style={styles.btnText}>Reject</Text>
                         </TouchableOpacity>
@@ -241,9 +215,8 @@ export default function Todo() {
                   </>
                 )}
 
-                {/* MALE INTEREST BUTTON */}
                 {isMale &&
-                  plan.createdBy !== user.phone &&
+                  plan.createdBy !== user.uid &&
                   plan.status === "open" && (
                     <TouchableOpacity
                       style={[
@@ -251,7 +224,7 @@ export default function Todo() {
                         alreadyRequested && { backgroundColor: "#555" },
                       ]}
                       disabled={alreadyRequested}
-                      onPress={() => handleInterested(plan.id)}
+                      onPress={() => handleInterested(plan)}
                     >
                       <Text style={styles.btnText}>
                         {alreadyRequested ? "Request Sent" : "Interested"}
@@ -322,14 +295,6 @@ const styles = StyleSheet.create({
     backgroundColor: "purple",
     padding: 8,
     marginTop: 10,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-
-  viewBtn: {
-    backgroundColor: "#444",
-    padding: 8,
-    marginTop: 8,
     borderRadius: 8,
     alignItems: "center",
   },

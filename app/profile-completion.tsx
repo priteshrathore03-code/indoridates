@@ -15,25 +15,11 @@ import IndoreBackground from "./components/IndoreBackground";
 
 export default function ProfileCompletion() {
   const router = useRouter();
-  const { user, saveProfile } = useUserProfile();
+  const { saveProfile } = useUserProfile();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
-
-  if (!user) {
-    return (
-      <IndoreBackground>
-        <FadeWrapper>
-          <View
-            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-          >
-            <ActivityIndicator size="large" color="#ff4d6d" />
-          </View>
-        </FadeWrapper>
-      </IndoreBackground>
-    );
-  }
 
   const handleNext = async () => {
     if (loading) return;
@@ -63,35 +49,37 @@ export default function ProfileCompletion() {
     <IndoreBackground>
       <FadeWrapper>
         <View style={styles.container}>
-          <Text style={styles.title}>Your Name</Text>
+          <View style={styles.card}>
+            <Text style={styles.title}>Your Name</Text>
 
-          <TextInput
-            placeholder="First Name"
-            placeholderTextColor="#666"
-            value={firstName}
-            onChangeText={setFirstName}
-            style={styles.input}
-          />
+            <TextInput
+              placeholder="First Name"
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              value={firstName}
+              onChangeText={setFirstName}
+              style={styles.input}
+            />
 
-          <TextInput
-            placeholder="Last Name"
-            placeholderTextColor="#666"
-            value={lastName}
-            onChangeText={setLastName}
-            style={styles.input}
-          />
+            <TextInput
+              placeholder="Last Name"
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              value={lastName}
+              onChangeText={setLastName}
+              style={styles.input}
+            />
 
-          <TouchableOpacity
-            style={[styles.button, loading && { opacity: 0.7 }]}
-            onPress={handleNext}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.btnText}>Next</Text>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, loading && { opacity: 0.7 }]}
+              onPress={handleNext}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.btnText}>Next</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </FadeWrapper>
     </IndoreBackground>
@@ -104,26 +92,44 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 25,
   },
+
+  card: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    padding: 30,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+
   title: {
-    fontSize: 24,
+    fontSize: 26,
     color: "white",
-    marginBottom: 30,
+    marginBottom: 35,
     textAlign: "center",
+    fontWeight: "bold",
   },
+
   input: {
-    backgroundColor: "rgba(255,255,255,0.85)",
-    padding: 14,
-    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    padding: 16,
+    borderRadius: 16,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
+    color: "white",
   },
+
   button: {
     backgroundColor: "#ff4d6d",
     padding: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: "center",
+    marginTop: 10,
   },
+
   btnText: {
     color: "white",
     fontWeight: "bold",
+    fontSize: 16,
   },
 });
