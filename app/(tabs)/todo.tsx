@@ -1,6 +1,9 @@
 import { useRouter } from "expo-router";
+import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
+  Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,11 +15,11 @@ import {
   addPlan,
   deletePlan,
   getAllPlans,
-  PlanStatus,
   PlanType,
   updatePlan,
 } from "../../data/planStore";
 import { useUserProfile } from "../../data/userProfile";
+import { db } from "../../firebaseConfig";
 import FadeWrapper from "../components/FadeWrapper";
 import IndoreBackground from "../components/IndoreBackground";
 
@@ -25,8 +28,8 @@ export default function Todo() {
   const { user } = useUserProfile();
 
   const [plans, setPlans] = useState<PlanType[]>([]);
+  const [usersMap, setUsersMap] = useState<any>({});
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("");
@@ -38,7 +41,28 @@ export default function Todo() {
 
   const loadPlans = async () => {
     const data = await getAllPlans();
-    setPlans(data);
+    setPlans(data || []);
+    await fetchUsers(data || []);
+  };
+
+  const fetchUsers = async (plansData: PlanType[]) => {
+    const map: any = {};
+
+    for (const plan of plansData) {
+      if (!map[plan.createdBy]) {
+        const snap = await getDoc(doc(db, "users", plan.createdBy));
+        if (snap.exists()) map[plan.createdBy] = snap.data();
+      }
+
+      for (const reqUid of plan.requests || []) {
+        if (!map[reqUid]) {
+          const snap = await getDoc(doc(db, "users", reqUid));
+          if (snap.exists()) map[reqUid] = snap.data();
+        }
+      }
+    }
+
+    setUsersMap(map);
   };
 
   if (!user) return null;
@@ -46,52 +70,39 @@ export default function Todo() {
   const isFemale = user.gender === "female";
   const isMale = user.gender === "male";
 
-  const resetForm = () => {
+  const handleCreate = async () => {
+    if (!title || !time || !brief) {
+      Alert.alert("Fill all fields");
+      return;
+    }
+
+    await addPlan({
+      title,
+      time,
+      brief,
+      createdBy: user.uid,
+      createdAt: Date.now(),
+      requests: [],
+      accepted: "",
+      status: "open",
+    });
+
     setTitle("");
     setTime("");
     setBrief("");
-    setEditingId(null);
     setShowForm(false);
-  };
-
-  const handleSave = async () => {
-    if (!title || !time || !brief) return;
-
-    if (editingId) {
-      await updatePlan(editingId, { title, time, brief });
-    } else {
-      const newPlan: PlanType = {
-        title,
-        time,
-        brief,
-        createdBy: user.uid,
-        createdByName: user.name || "User",
-        requests: [],
-        accepted: "",
-        status: "open",
-        createdAt: Date.now(),
-      };
-      await addPlan(newPlan);
-    }
-
-    await loadPlans();
-    resetForm();
-  };
-
-  const handleDelete = async (id: string) => {
-    await deletePlan(id);
-    await loadPlans();
+    loadPlans();
   };
 
   const handleInterested = async (plan: PlanType) => {
     if (!plan.id) return;
+    if (plan.requests.includes(user.uid)) return;
 
-    if (!plan.requests.includes(user.uid)) {
-      await updatePlan(plan.id, {
-        requests: [...plan.requests, user.uid],
-      });
-      await loadPlans();
-    }
+    await updatePlan(plan.id, {
+      requests: [...plan.requests, user.uid],
+    });
+
+    loadPlans();
   };
 
   const handleAccept = async (plan: PlanType, uid: string) => {
@@ -99,138 +110,155 @@ export default function Todo() {
 
     await updatePlan(plan.id, {
       accepted: uid,
-      status: "matched" as PlanStatus,
+      status: "matched",
     });
 
-    await loadPlans();
+    loadPlans();
   };
 
-  const handleReject = async (plan: PlanType, uid: string) => {
-    if (!plan.id) return;
-
-    await updatePlan(plan.id, {
-      requests: plan.requests.filter((r) => r !== uid),
-    });
-
-    await loadPlans();
+  const handleDelete = async (id: string) => {
+    await deletePlan(id);
+    loadPlans();
   };
 
   return (
     <IndoreBackground>
       <FadeWrapper>
         <ScrollView style={styles.container}>
+          {/* 🔥 FEMALE CREATE BUTTON */}
           {isFemale && (
-            <TouchableOpacity
-              style={styles.createBtn}
-              onPress={() => setShowForm(!showForm)}
-            >
-              <Text style={styles.btnText}>
-                {showForm ? "Cancel" : "Create Plan"}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {showForm && (
-            <View style={styles.form}>
-              <TextInput
-                placeholder="Title"
-                placeholderTextColor="#aaa"
-                style={styles.input}
-                value={title}
-                onChangeText={setTitle}
-              />
-              <TextInput
-                placeholder="Time"
-                placeholderTextColor="#aaa"
-                style={styles.input}
-                value={time}
-                onChangeText={setTime}
-              />
-              <TextInput
-                placeholder="Brief"
-                placeholderTextColor="#aaa"
-                style={styles.input}
-                value={brief}
-                onChangeText={setBrief}
-              />
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+            <>
+              <TouchableOpacity
+                style={styles.createBtn}
+                onPress={() => setShowForm(!showForm)}
+              >
                 <Text style={styles.btnText}>
-                  {editingId ? "Update" : "Save"}
+                  {showForm ? "Cancel" : "Create Plan"}
                 </Text>
               </TouchableOpacity>
-            </View>
+
+              {showForm && (
+                <View style={styles.form}>
+                  <TextInput
+                    placeholder="Title"
+                    style={styles.input}
+                    value={title}
+                    onChangeText={setTitle}
+                  />
+                  <TextInput
+                    placeholder="Time"
+                    style={styles.input}
+                    value={time}
+                    onChangeText={setTime}
+                  />
+                  <TextInput
+                    placeholder="Brief"
+                    style={styles.input}
+                    value={brief}
+                    onChangeText={setBrief}
+                  />
+                  <TouchableOpacity
+                    style={styles.saveBtn}
+                    onPress={handleCreate}
+                  >
+                    <Text style={styles.btnText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
           )}
 
           {plans.map((plan) => {
+            const creator = usersMap[plan.createdBy];
             const alreadyRequested = plan.requests.includes(user.uid);
 
             return (
               <View key={plan.id} style={styles.card}>
-                <Text style={styles.name}>{plan.createdByName}</Text>
+                {creator && (
+                  <View style={styles.profileRow}>
+                    <Image
+                      source={{ uri: creator.photos?.[0] }}
+                      style={styles.profileImage}
+                    />
+                    <Text style={styles.name}>{creator.name}</Text>
+                  </View>
+                )}
+
                 <Text style={styles.title}>{plan.title}</Text>
                 <Text style={styles.time}>{plan.time}</Text>
                 <Text style={styles.brief}>{plan.brief}</Text>
 
+                {/* VIEW PROFILE ONLY IF NOT SELF */}
+                {plan.createdBy !== user.uid && (
+                  <TouchableOpacity
+                    style={styles.viewBtn}
+                    onPress={() => router.push(`/user/${plan.createdBy}`)}
+                  >
+                    <Text style={styles.btnText}>View Profile</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* FEMALE OWN PLAN CONTROLS */}
                 {isFemale && plan.createdBy === user.uid && (
                   <>
                     <TouchableOpacity
-                      style={styles.editBtn}
-                      onPress={() => {
-                        setEditingId(plan.id || null);
-                        setTitle(plan.title);
-                        setTime(plan.time);
-                        setBrief(plan.brief);
-                        setShowForm(true);
-                      }}
-                    >
-                      <Text style={styles.btnText}>Edit</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
                       style={styles.deleteBtn}
-                      onPress={() => plan.id && handleDelete(plan.id)}
+                      onPress={() => handleDelete(plan.id!)}
                     >
                       <Text style={styles.btnText}>Delete</Text>
                     </TouchableOpacity>
 
-                    {plan.requests.map((req) => (
-                      <View key={req} style={styles.requestBox}>
-                        <Text style={{ color: "white" }}>New Request</Text>
+                    {plan.requests.map((reqUid) => {
+                      const reqUser = usersMap[reqUid];
+                      return (
+                        <View key={reqUid} style={styles.requestBox}>
+                          {reqUser && (
+                            <>
+                              <Image
+                                source={{ uri: reqUser.photos?.[0] }}
+                                style={styles.profileImage}
+                              />
+                              <Text style={{ color: "white" }}>
+                                {reqUser.name}
+                              </Text>
 
-                        <TouchableOpacity
-                          style={styles.editBtn}
-                          onPress={() => handleAccept(plan, req)}
-                        >
-                          <Text style={styles.btnText}>Accept</Text>
-                        </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.viewBtn}
+                                onPress={() => router.push(`/user/${reqUid}`)}
+                              >
+                                <Text style={styles.btnText}>View Profile</Text>
+                              </TouchableOpacity>
 
-                        <TouchableOpacity
-                          style={styles.deleteBtn}
-                          onPress={() => handleReject(plan, req)}
-                        >
-                          <Text style={styles.btnText}>Reject</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
+                              <TouchableOpacity
+                                style={styles.acceptBtn}
+                                onPress={() => handleAccept(plan, reqUid)}
+                              >
+                                <Text style={styles.btnText}>Accept</Text>
+                              </TouchableOpacity>
+                            </>
+                          )}
+                        </View>
+                      );
+                    })}
                   </>
                 )}
 
+                {/* MALE INTEREST */}
                 {isMale &&
                   plan.createdBy !== user.uid &&
-                  plan.status === "open" && (
+                  plan.status === "open" &&
+                  (alreadyRequested ? (
+                    <Text style={{ color: "yellow", marginTop: 10 }}>
+                      Request Sent
+                    </Text>
+                  ) : (
                     <TouchableOpacity
-                      style={[
-                        styles.interestBtn,
-                        alreadyRequested && { backgroundColor: "#555" },
-                      ]}
-                      disabled={alreadyRequested}
+                      style={styles.interestBtn}
                       onPress={() => handleInterested(plan)}
                     >
-                      <Text style={styles.btnText}>
-                        {alreadyRequested ? "Request Sent" : "Interested"}
-                      </Text>
+                      <Text style={styles.btnText}>Interested</Text>
                     </TouchableOpacity>
-                  )}
+                  ))}
 
                 {plan.status === "matched" && (
                   <Text style={{ color: "green", marginTop: 10 }}>
@@ -248,61 +276,17 @@ export default function Todo() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 10 },
-  card: {
-    backgroundColor: "#222",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-  },
-  name: { color: "yellow", fontWeight: "bold" },
-  title: { color: "white", fontSize: 16, marginTop: 5 },
-  time: { color: "orange", marginTop: 3 },
-  brief: { color: "white", marginTop: 5 },
 
   createBtn: {
     backgroundColor: "purple",
-    padding: 10,
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 10,
     alignItems: "center",
     marginBottom: 15,
   },
 
-  saveBtn: {
-    backgroundColor: "green",
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 10,
-  },
-
-  editBtn: {
-    backgroundColor: "blue",
-    padding: 8,
-    marginTop: 8,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-
-  deleteBtn: {
-    backgroundColor: "red",
-    padding: 8,
-    marginTop: 8,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-
-  interestBtn: {
-    backgroundColor: "purple",
-    padding: 8,
-    marginTop: 10,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-
-  btnText: { color: "white", fontWeight: "bold" },
-
   form: {
-    backgroundColor: "#333",
+    backgroundColor: "rgba(0,0,0,0.6)",
     padding: 15,
     borderRadius: 10,
     marginBottom: 15,
@@ -311,10 +295,72 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: "#444",
     color: "white",
-    padding: 8,
+    padding: 10,
     borderRadius: 8,
     marginBottom: 10,
   },
+
+  saveBtn: {
+    backgroundColor: "green",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+
+  card: {
+    backgroundColor: "rgba(0,0,0,0.7)",
+    padding: 15,
+    borderRadius: 15,
+    marginBottom: 15,
+  },
+
+  profileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 10,
+  },
+
+  name: { color: "yellow", fontWeight: "bold" },
+  title: { color: "white", fontSize: 16 },
+  time: { color: "orange" },
+  brief: { color: "white" },
+
+  viewBtn: {
+    backgroundColor: "#444",
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+
+  deleteBtn: {
+    backgroundColor: "red",
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+
+  interestBtn: {
+    backgroundColor: "purple",
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+
+  acceptBtn: {
+    backgroundColor: "blue",
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+
+  btnText: { color: "white", fontWeight: "bold" },
 
   requestBox: {
     marginTop: 10,

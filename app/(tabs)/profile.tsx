@@ -1,4 +1,6 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { doc, getDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
 import {
   Image,
   ScrollView,
@@ -8,18 +10,39 @@ import {
   View,
 } from "react-native";
 import { useUserProfile } from "../../data/userProfile";
+import { db } from "../../firebaseConfig";
 import FadeWrapper from "../components/FadeWrapper";
 import IndoreBackground from "../components/IndoreBackground";
 
 export default function Profile() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const { user, logout } = useUserProfile();
 
-  if (!user) return null;
+  const [viewUser, setViewUser] = useState<any>(null);
+
+  const isOtherProfile = params.uid && user && params.uid !== user.uid;
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (isOtherProfile && params.uid) {
+        const snap = await getDoc(doc(db, "users", String(params.uid)));
+        if (snap.exists()) {
+          setViewUser(snap.data());
+        }
+      } else {
+        setViewUser(user);
+      }
+    };
+
+    loadProfile();
+  }, [params.uid, user]);
+
+  if (!viewUser) return null;
 
   const handleLogout = async () => {
     await logout();
-    router.replace("/"); // 👈 start page pe bhejega
+    router.replace("/welcome");
   };
 
   return (
@@ -27,57 +50,71 @@ export default function Profile() {
       <FadeWrapper>
         <ScrollView contentContainerStyle={styles.container}>
           <View style={styles.card}>
-            <Text style={styles.title}>My Profile</Text>
+            {/* 🔥 Back button only in other profile */}
+            {isOtherProfile && (
+              <TouchableOpacity onPress={() => router.back()}>
+                <Text style={styles.backText}>← Back</Text>
+              </TouchableOpacity>
+            )}
 
-            {user.photos && user.photos.length > 0 && (
+            <Text style={styles.title}>
+              {isOtherProfile ? "User Profile" : "My Profile"}
+            </Text>
+
+            {viewUser.photos && viewUser.photos.length > 0 && (
               <View style={styles.photoRow}>
-                {user.photos.map((uri, index) => (
+                {viewUser.photos.map((uri: string, index: number) => (
                   <Image key={index} source={{ uri }} style={styles.photo} />
                 ))}
               </View>
             )}
 
-            <Text style={styles.label}>Phone</Text>
-            <Text style={styles.value}>{user.phone}</Text>
-
-            {user.name && (
+            {viewUser.name && (
               <>
                 <Text style={styles.label}>Name</Text>
-                <Text style={styles.value}>{user.name}</Text>
+                <Text style={styles.value}>{viewUser.name}</Text>
               </>
             )}
 
-            {user.age && (
+            {viewUser.age && (
               <>
                 <Text style={styles.label}>Age</Text>
-                <Text style={styles.value}>{user.age}</Text>
+                <Text style={styles.value}>{viewUser.age}</Text>
               </>
             )}
 
-            {user.gender && (
+            {viewUser.gender && (
               <>
                 <Text style={styles.label}>Gender</Text>
-                <Text style={styles.value}>{user.gender}</Text>
+                <Text style={styles.value}>{viewUser.gender}</Text>
               </>
             )}
 
-            {user.bio && user.bio.trim() !== "" && (
+            {viewUser.bio && (
               <>
                 <Text style={styles.label}>Bio</Text>
-                <Text style={styles.value}>{user.bio}</Text>
+                <Text style={styles.value}>{viewUser.bio}</Text>
               </>
             )}
 
-            <TouchableOpacity
-              style={styles.editBtn}
-              onPress={() => router.push("/edit-profile")}
-            >
-              <Text style={styles.btnText}>Edit Profile</Text>
-            </TouchableOpacity>
+            {/* 🔥 Only in My Profile */}
+            {!isOtherProfile && (
+              <>
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={() => router.push("/edit-profile")}
+                >
+                  <Text style={styles.btnText}>Edit Profile</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <Text style={styles.btnText}>Logout</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.logoutBtn}
+                  onPress={handleLogout}
+                >
+                  <Text style={styles.btnText}>Logout</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </ScrollView>
       </FadeWrapper>
@@ -86,18 +123,16 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 20,
-  },
-
+  container: { flexGrow: 1, justifyContent: "center", padding: 20 },
   card: {
     backgroundColor: "rgba(255,255,255,0.15)",
     borderRadius: 20,
     padding: 20,
   },
-
+  backText: {
+    color: "white",
+    marginBottom: 10,
+  },
   title: {
     fontSize: 22,
     fontWeight: "bold",
@@ -105,31 +140,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: "center",
   },
-
-  label: {
-    color: "#ccc",
-    marginTop: 10,
-  },
-
-  value: {
-    color: "white",
-    fontSize: 16,
-  },
-
-  photoRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginBottom: 15,
-  },
-
+  label: { color: "#ccc", marginTop: 10 },
+  value: { color: "white", fontSize: 16 },
+  photoRow: { flexDirection: "row", flexWrap: "wrap", marginBottom: 15 },
   photo: {
-    width: 70,
-    height: 70,
-    borderRadius: 10,
+    width: 80,
+    height: 80,
+    borderRadius: 12,
     marginRight: 10,
     marginBottom: 10,
   },
-
   editBtn: {
     backgroundColor: "#3b82f6",
     padding: 15,
@@ -137,7 +157,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     alignItems: "center",
   },
-
   logoutBtn: {
     backgroundColor: "#ff4d6d",
     padding: 15,
@@ -145,9 +164,5 @@ const styles = StyleSheet.create({
     marginTop: 10,
     alignItems: "center",
   },
-
-  btnText: {
-    color: "white",
-    fontWeight: "bold",
-  },
+  btnText: { color: "white", fontWeight: "bold" },
 });

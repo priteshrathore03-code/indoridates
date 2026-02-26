@@ -16,7 +16,7 @@ export type PlanType = {
   time: string;
   brief: string;
   createdBy: string;
-  createdByName: string;
+  createdByName?: string; // 🔥 optional
   requests: string[];
   accepted: string;
   status: PlanStatus;
@@ -25,7 +25,7 @@ export type PlanType = {
 
 const plansCollection = collection(db, "plans");
 
-export const addPlan = async (plan: PlanType) => {
+export const addPlan = async (plan: Omit<PlanType, "id">) => {
   await addDoc(plansCollection, plan);
 };
 
@@ -34,7 +34,7 @@ export const getAllPlans = async (): Promise<PlanType[]> => {
 
   return snapshot.docs.map((docItem) => ({
     id: docItem.id,
-    ...(docItem.data() as Omit<PlanType, "id">),
+    ...(docItem.data() as PlanType),
   }));
 };
 

@@ -16,7 +16,8 @@ export default function CreatePlan() {
   const { user } = useUserProfile();
 
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [time, setTime] = useState("");
+  const [brief, setBrief] = useState("");
 
   const handleCreate = async () => {
     if (!user) {
@@ -24,7 +25,7 @@ export default function CreatePlan() {
       return;
     }
 
-    if (!title.trim() || !description.trim()) {
+    if (!title.trim() || !time.trim() || !brief.trim()) {
       Alert.alert("Error", "Fill all fields");
       return;
     }
@@ -32,9 +33,13 @@ export default function CreatePlan() {
     try {
       await addPlan({
         title: title.trim(),
-        description: description.trim(),
-        createdBy: user.uid, // ✅ now guaranteed string
+        time: time.trim(),
+        brief: brief.trim(),
+        createdBy: user.uid,
         createdByName: user.name || "Indori",
+        requests: [],
+        accepted: "",
+        status: "open",
         createdAt: Date.now(),
       });
 
@@ -58,9 +63,16 @@ export default function CreatePlan() {
       />
 
       <TextInput
-        placeholder="Plan Description"
-        value={description}
-        onChangeText={setDescription}
+        placeholder="Time (e.g. 10 PM)"
+        value={time}
+        onChangeText={setTime}
+        style={styles.input}
+      />
+
+      <TextInput
+        placeholder="Brief"
+        value={brief}
+        onChangeText={setBrief}
         style={styles.input}
         multiline
       />
