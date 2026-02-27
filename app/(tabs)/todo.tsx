@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { createChatRoom } from "../../data/chatStore";
 import {
   addPlan,
   deletePlan,
@@ -105,15 +106,22 @@ export default function Todo() {
     loadPlans();
   };
 
-  const handleAccept = async (plan: PlanType, uid: string) => {
+  const handleAccept = async (plan: PlanType, reqUid: string) => {
     if (!plan.id) return;
 
-    await updatePlan(plan.id, {
-      accepted: uid,
-      status: "matched",
-    });
+    try {
+      const roomId = await createChatRoom(plan.createdBy, reqUid);
 
-    loadPlans();
+      await deletePlan(plan.id);
+      await loadPlans();
+
+      router.replace({
+        pathname: "/(tabs)/chat",
+        params: { roomId },
+      });
+    } catch (error: any) {
+      console.log("ACCEPT ERROR FULL:", error);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -125,7 +133,6 @@ export default function Todo() {
     <IndoreBackground>
       <FadeWrapper>
         <ScrollView style={styles.container}>
-          {/* 🔥 FEMALE CREATE BUTTON */}
           {isFemale && (
             <>
               <TouchableOpacity
@@ -188,7 +195,7 @@ export default function Todo() {
                 <Text style={styles.time}>{plan.time}</Text>
                 <Text style={styles.brief}>{plan.brief}</Text>
 
-                {/* VIEW PROFILE ONLY IF NOT SELF */}
+                {/* 🔥 VIEW PROFILE FOR OTHERS */}
                 {plan.createdBy !== user.uid && (
                   <TouchableOpacity
                     style={styles.viewBtn}
@@ -198,7 +205,7 @@ export default function Todo() {
                   </TouchableOpacity>
                 )}
 
-                {/* FEMALE OWN PLAN CONTROLS */}
+                {/* FEMALE OWN PLAN */}
                 {isFemale && plan.createdBy === user.uid && (
                   <>
                     <TouchableOpacity
@@ -214,14 +221,11 @@ export default function Todo() {
                         <View key={reqUid} style={styles.requestBox}>
                           {reqUser && (
                             <>
-                              <Image
-                                source={{ uri: reqUser.photos?.[0] }}
-                                style={styles.profileImage}
-                              />
                               <Text style={{ color: "white" }}>
                                 {reqUser.name}
                               </Text>
 
+                              {/* ✅ View Profile back added */}
                               <TouchableOpacity
                                 style={styles.viewBtn}
                                 onPress={() => router.push(`/user/${reqUid}`)}
@@ -230,8 +234,12 @@ export default function Todo() {
                               </TouchableOpacity>
 
                               <TouchableOpacity
-                                style={styles.acceptBtn}
-                                onPress={() => handleAccept(plan, reqUid)}
+                                style={[styles.acceptBtn, { zIndex: 999 }]}
+                                activeOpacity={0.7}
+                                onPress={() => {
+                                  console.log("ACCEPT BUTTON CLICKED");
+                                  handleAccept(plan, reqUid);
+                                }}
                               >
                                 <Text style={styles.btnText}>Accept</Text>
                               </TouchableOpacity>
@@ -242,11 +250,9 @@ export default function Todo() {
                     })}
                   </>
                 )}
-
                 {/* MALE INTEREST */}
                 {isMale &&
                   plan.createdBy !== user.uid &&
-                  plan.status === "open" &&
                   (alreadyRequested ? (
                     <Text style={{ color: "yellow", marginTop: 10 }}>
                       Request Sent
@@ -259,12 +265,6 @@ export default function Todo() {
                       <Text style={styles.btnText}>Interested</Text>
                     </TouchableOpacity>
                   ))}
-
-                {plan.status === "matched" && (
-                  <Text style={{ color: "green", marginTop: 10 }}>
-                    ✅ Matched
-                  </Text>
-                )}
               </View>
             );
           })}
@@ -312,6 +312,8 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 15,
     marginBottom: 15,
+    position: "relative",
+    zIndex: 1,
   },
 
   profileRow: {

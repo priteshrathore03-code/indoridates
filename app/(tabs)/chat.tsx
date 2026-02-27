@@ -1,12 +1,20 @@
+import { useLocalSearchParams } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import IndoreBackground from "../components/IndoreBackground";
 
 export default function Chat() {
+  const { roomId } = useLocalSearchParams();
+
   return (
     <IndoreBackground>
       <View style={styles.container}>
         <Text style={styles.title}>💬 Chat</Text>
-        <Text style={styles.subtitle}>Start your vibe</Text>
+
+        {roomId ? (
+          <Text style={styles.subtitle}>Room ID: {roomId}</Text>
+        ) : (
+          <Text style={styles.subtitle}>No Room Selected</Text>
+        )}
       </View>
     </IndoreBackground>
   );
@@ -15,6 +23,7 @@ export default function Chat() {
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
+    marginTop: 100,
   },
   title: {
     fontSize: 26,
