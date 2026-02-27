@@ -3,7 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
-  getDocs,
+  onSnapshot,
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
@@ -16,7 +16,7 @@ export type PlanType = {
   time: string;
   brief: string;
   createdBy: string;
-  createdByName?: string; // 🔥 optional
+  createdByName?: string;
   requests: string[];
   accepted: string;
   status: PlanStatus;
@@ -29,13 +29,15 @@ export const addPlan = async (plan: Omit<PlanType, "id">) => {
   await addDoc(plansCollection, plan);
 };
 
-export const getAllPlans = async (): Promise<PlanType[]> => {
-  const snapshot = await getDocs(plansCollection);
+export const listenPlans = (callback: (plans: PlanType[]) => void) => {
+  return onSnapshot(plansCollection, (snapshot) => {
+    const plans = snapshot.docs.map((docItem) => ({
+      id: docItem.id,
+      ...(docItem.data() as PlanType),
+    }));
 
-  return snapshot.docs.map((docItem) => ({
-    id: docItem.id,
-    ...(docItem.data() as PlanType),
-  }));
+    callback(plans);
+  });
 };
 
 export const updatePlan = async (id: string, data: Partial<PlanType>) => {

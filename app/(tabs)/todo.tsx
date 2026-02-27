@@ -15,7 +15,7 @@ import { createChatRoom } from "../../data/chatStore";
 import {
   addPlan,
   deletePlan,
-  getAllPlans,
+  listenPlans,
   PlanType,
   updatePlan,
 } from "../../data/planStore";
@@ -36,15 +36,15 @@ export default function Todo() {
   const [time, setTime] = useState("");
   const [brief, setBrief] = useState("");
 
+  // 🔥 REALTIME LISTENER
   useEffect(() => {
-    loadPlans();
-  }, []);
+    const unsubscribe = listenPlans(async (data) => {
+      setPlans(data);
+      await fetchUsers(data);
+    });
 
-  const loadPlans = async () => {
-    const data = await getAllPlans();
-    setPlans(data || []);
-    await fetchUsers(data || []);
-  };
+    return () => unsubscribe();
+  }, []);
 
   const fetchUsers = async (plansData: PlanType[]) => {
     const map: any = {};
@@ -92,7 +92,6 @@ export default function Todo() {
     setTime("");
     setBrief("");
     setShowForm(false);
-    loadPlans();
   };
 
   const handleInterested = async (plan: PlanType) => {
@@ -102,8 +101,6 @@ export default function Todo() {
     await updatePlan(plan.id, {
       requests: [...plan.requests, user.uid],
     });
-
-    loadPlans();
   };
 
   const handleAccept = async (plan: PlanType, reqUid: string) => {
@@ -113,7 +110,6 @@ export default function Todo() {
       const roomId = await createChatRoom(plan.createdBy, reqUid);
 
       await deletePlan(plan.id);
-      await loadPlans();
 
       router.replace({
         pathname: "/(tabs)/chat",
@@ -126,7 +122,6 @@ export default function Todo() {
 
   const handleDelete = async (id: string) => {
     await deletePlan(id);
-    loadPlans();
   };
 
   return (
@@ -195,7 +190,6 @@ export default function Todo() {
                 <Text style={styles.time}>{plan.time}</Text>
                 <Text style={styles.brief}>{plan.brief}</Text>
 
-                {/* 🔥 VIEW PROFILE FOR OTHERS */}
                 {plan.createdBy !== user.uid && (
                   <TouchableOpacity
                     style={styles.viewBtn}
@@ -205,7 +199,6 @@ export default function Todo() {
                   </TouchableOpacity>
                 )}
 
-                {/* FEMALE OWN PLAN */}
                 {isFemale && plan.createdBy === user.uid && (
                   <>
                     <TouchableOpacity
@@ -225,7 +218,6 @@ export default function Todo() {
                                 {reqUser.name}
                               </Text>
 
-                              {/* ✅ View Profile back added */}
                               <TouchableOpacity
                                 style={styles.viewBtn}
                                 onPress={() => router.push(`/user/${reqUid}`)}
@@ -234,12 +226,8 @@ export default function Todo() {
                               </TouchableOpacity>
 
                               <TouchableOpacity
-                                style={[styles.acceptBtn, { zIndex: 999 }]}
-                                activeOpacity={0.7}
-                                onPress={() => {
-                                  console.log("ACCEPT BUTTON CLICKED");
-                                  handleAccept(plan, reqUid);
-                                }}
+                                style={styles.acceptBtn}
+                                onPress={() => handleAccept(plan, reqUid)}
                               >
                                 <Text style={styles.btnText}>Accept</Text>
                               </TouchableOpacity>
@@ -250,7 +238,7 @@ export default function Todo() {
                     })}
                   </>
                 )}
-                {/* MALE INTEREST */}
+
                 {isMale &&
                   plan.createdBy !== user.uid &&
                   (alreadyRequested ? (
@@ -276,7 +264,6 @@ export default function Todo() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 10 },
-
   createBtn: {
     backgroundColor: "purple",
     padding: 12,
@@ -284,14 +271,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 15,
   },
-
   form: {
     backgroundColor: "rgba(0,0,0,0.6)",
     padding: 15,
     borderRadius: 10,
     marginBottom: 15,
   },
-
   input: {
     backgroundColor: "#444",
     color: "white",
@@ -299,71 +284,58 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 10,
   },
-
   saveBtn: {
     backgroundColor: "green",
     padding: 10,
     borderRadius: 8,
     alignItems: "center",
   },
-
   card: {
     backgroundColor: "rgba(0,0,0,0.7)",
     padding: 15,
     borderRadius: 15,
     marginBottom: 15,
-    position: "relative",
-    zIndex: 1,
   },
-
   profileRow: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 10,
   },
-
   profileImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
     marginRight: 10,
   },
-
   name: { color: "yellow", fontWeight: "bold" },
   title: { color: "white", fontSize: 16 },
   time: { color: "orange" },
   brief: { color: "white" },
-
   viewBtn: {
     backgroundColor: "#444",
     padding: 8,
     borderRadius: 8,
     marginTop: 8,
   },
-
   deleteBtn: {
     backgroundColor: "red",
     padding: 8,
     borderRadius: 8,
     marginTop: 8,
   },
-
   interestBtn: {
     backgroundColor: "purple",
     padding: 8,
     borderRadius: 8,
     marginTop: 10,
   },
-
   acceptBtn: {
     backgroundColor: "blue",
     padding: 8,
     borderRadius: 8,
     marginTop: 8,
   },
-
   btnText: { color: "white", fontWeight: "bold" },
-
   requestBox: {
     marginTop: 10,
     backgroundColor: "#333",

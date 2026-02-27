@@ -1,20 +1,46 @@
-import { useLocalSearchParams } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { auth } from "../../firebaseConfig";
+import { useChatRooms } from "../../hooks/useChatRooms";
 import IndoreBackground from "../components/IndoreBackground";
 
-export default function Chat() {
-  const { roomId } = useLocalSearchParams();
+export default function ChatListScreen() {
+  const router = useRouter();
+  const currentUserId = auth.currentUser?.uid || "";
+
+  const { rooms } = useChatRooms(currentUserId);
 
   return (
     <IndoreBackground>
       <View style={styles.container}>
-        <Text style={styles.title}>💬 Chat</Text>
+        <FlatList
+          data={rooms}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => {
+            const otherUserId = item.users.find(
+              (id: string) => id !== currentUserId,
+            );
 
-        {roomId ? (
-          <Text style={styles.subtitle}>Room ID: {roomId}</Text>
-        ) : (
-          <Text style={styles.subtitle}>No Room Selected</Text>
-        )}
+            return (
+              <TouchableOpacity
+                style={styles.room}
+                onPress={() => router.push(`/chat/${item.id}`)}
+              >
+                <Text style={styles.name}>{otherUserId}</Text>
+
+                <Text style={styles.lastMessage} numberOfLines={1}>
+                  {item.lastMessage?.text || "Start chatting..."}
+                </Text>
+              </TouchableOpacity>
+            );
+          }}
+        />
       </View>
     </IndoreBackground>
   );
@@ -22,17 +48,23 @@ export default function Chat() {
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: "center",
-    marginTop: 100,
+    flex: 1,
+    paddingTop: 60,
+    paddingHorizontal: 16,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
+  room: {
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: "600",
     color: "white",
   },
-  subtitle: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#ddd",
+  lastMessage: {
+    fontSize: 14,
+    color: "#ccc",
+    marginTop: 4,
   },
 });
