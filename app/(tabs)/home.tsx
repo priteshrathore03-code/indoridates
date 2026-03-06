@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   Image,
   StyleSheet,
   Text,
@@ -8,24 +9,19 @@ import {
   View,
 } from "react-native";
 
-import {
-  collection,
-  doc,
-  getDocs,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../../firebaseConfig";
 
 import FadeWrapper from "../components/FadeWrapper";
 import IndoreBackground from "../components/IndoreBackground";
 
+const { width } = Dimensions.get("window");
+
 type UserProfile = {
   id: string;
   name: string;
-  age: number;
+  age?: number;
   bio?: string;
-  gender?: string;
   photos?: string[];
 };
 
@@ -35,125 +31,113 @@ export default function Home() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, "users"));
+    const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
       const currentUid = auth.currentUser?.uid;
-
-      const fetchedUsers: UserProfile[] = [];
+      const fetched: UserProfile[] = [];
 
       snapshot.forEach((docSnap) => {
-        if (docSnap.id !== currentUid) {
-          const data = docSnap.data();
-          fetchedUsers.push({
+        if (docSnap.id === currentUid) return;
+        const data = docSnap.data();
+        const photos = Array.isArray(data.photos)
+          ? data.photos.filter((p: string) => p && p.trim() !== "")
+          : [];
+
+        if (photos.length >= 1) {
+          fetched.push({
             id: docSnap.id,
             name: data.name || "Indori",
             age: data.age || 18,
-            bio: data.bio || "Rajwada pe coffee? 😎",
-            gender: data.gender,
-            photos: data.photos || [],
+            bio: data.bio || "Bhiya kaise ho!",
+            photos: photos,
           });
         }
       });
-
-      setUsers(fetchedUsers);
-    } catch (error) {
-      console.log("FETCH ERROR:", error);
-    } finally {
+      setUsers(fetched);
       setLoading(false);
-    }
-  };
-
-  const handleLike = async () => {
-    const currentUser = auth.currentUser;
-    const likedUser = users[currentIndex];
-
-    if (!currentUser || !likedUser) return;
-
-    // 🔥 Save Like
-    await setDoc(doc(db, "likes", `${currentUser.uid}_${likedUser.id}`), {
-      from: currentUser.uid,
-      to: likedUser.id,
-      createdAt: serverTimestamp(),
     });
+    return () => unsubscribe();
+  }, []);
 
-    setCurrentIndex((prev) => prev + 1);
-  };
-
-  const handleDislike = () => {
-    setCurrentIndex((prev) => prev + 1);
-  };
-
-  if (loading) {
+  if (loading)
     return (
       <IndoreBackground>
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#ff4d6d" />
-        </View>
+        <ActivityIndicator style={{ flex: 1 }} color="#ff4d6d" />
       </IndoreBackground>
     );
-  }
 
   const user = users[currentIndex];
-
-  if (!user) {
+  if (!user)
     return (
       <IndoreBackground>
         <View style={styles.loader}>
-          <Text style={styles.noMoreText}>
-            Aaj ke liye bas itne hi Indori mile 😅
-          </Text>
+          <Text style={styles.noMoreText}>Sab khatam! 😅</Text>
         </View>
       </IndoreBackground>
     );
-  }
+
+  // ✅ YAHAN DEKH: URI ko clean kar rahe hain
+  const imageUri =
+    Array.isArray(user.photos) && user.photos.length > 0
+      ? user.photos[0]
+      : null;
 
   return (
     <IndoreBackground>
       <FadeWrapper>
         <View style={styles.container}>
           <View style={styles.card}>
-            <Image
-              source={{
-                uri:
-                  user.photos && user.photos.length > 0
-                    ? user.photos[0]
-                    : "https://via.placeholder.com/400",
-              }}
-              style={styles.image}
-            />
-
-            <View style={styles.overlay} />
+            {imageUri ? (
+              <View style={styles.imageContainer}>
+                <Image
+                  key={imageUri}
+                  source={{ uri: imageUri }}
+                  style={styles.image}
+                  resizeMode="cover"
+                  onLoadStart={() => console.log("Trying to load:", imageUri)}
+                  onError={(e) =>
+                    console.log(
+                      "Load Failed for:",
+                      imageUri,
+                      e.nativeEvent.error,
+                    )
+                  }
+                />
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.image,
+                  {
+                    backgroundColor: "#222",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  },
+                ]}
+              >
+                <Text style={{ color: "white" }}>No Photo URL</Text>
+              </View>
+            )}
 
             <View style={styles.infoBox}>
               <Text style={styles.name}>
                 {user.name}, {user.age}
               </Text>
-
-              <Text numberOfLines={2} style={styles.bio}>
-                {user.bio}
-              </Text>
-
-              <Text style={styles.city}>📍 Indore • Rajwada Vibes</Text>
+              <Text style={styles.bio}>{user.bio}</Text>
             </View>
           </View>
 
           <View style={styles.actions}>
             <TouchableOpacity
-              style={[styles.actionBtn, styles.dislike]}
-              onPress={handleDislike}
+              style={styles.actionBtn}
+              onPress={() => setCurrentIndex((p) => p + 1)}
             >
-              <Text style={styles.actionText}>❌</Text>
+              <Text style={{ fontSize: 30 }}>❌</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
-              style={[styles.actionBtn, styles.like]}
-              onPress={handleLike}
+              style={[styles.actionBtn, { backgroundColor: "#ff4d6d" }]}
+              onPress={() => setCurrentIndex((p) => p + 1)}
             >
-              <Text style={styles.actionText}>❤️</Text>
+              <Text style={{ fontSize: 30 }}>❤️</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -163,74 +147,46 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    justifyContent: "center",
-  },
-  loader: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  noMoreText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
+  container: { flex: 1, padding: 15, justifyContent: "center" },
+  loader: { flex: 1, justifyContent: "center", alignItems: "center" },
+  noMoreText: { color: "white", fontSize: 18 },
   card: {
-    borderRadius: 28,
+    height: 450,
+    borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "#111", // Black background agar photo na load ho
+    position: "relative",
+  },
+  imageContainer: {
+    width: "100%",
+    height: "100%",
+    position: "absolute",
   },
   image: {
     width: "100%",
-    height: 420,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    height: "100%",
   },
   infoBox: {
     position: "absolute",
-    bottom: 20,
-    left: 20,
-    right: 20,
+    bottom: 0,
+    padding: 20,
+    width: "100%",
+    backgroundColor: "rgba(0,0,0,0.4)",
   },
-  name: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: "white",
-  },
-  bio: {
-    marginTop: 6,
-    color: "white",
-    opacity: 0.9,
-  },
-  city: {
-    marginTop: 8,
-    color: "#ff4d6d",
-    fontWeight: "600",
-  },
+  name: { fontSize: 24, fontWeight: "bold", color: "white" },
+  bio: { color: "white", marginTop: 5 },
   actions: {
     flexDirection: "row",
-    justifyContent: "space-evenly",
-    marginTop: 25,
+    justifyContent: "space-around",
+    marginTop: 20,
   },
   actionBtn: {
-    width: 75,
-    height: 75,
-    borderRadius: 40,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "#333",
     justifyContent: "center",
     alignItems: "center",
   },
-  like: {
-    backgroundColor: "#ff4d6d",
-  },
-  dislike: {
-    backgroundColor: "#444",
-  },
-  actionText: {
-    fontSize: 30,
-  },
+  actionText: { fontSize: 25 },
 });

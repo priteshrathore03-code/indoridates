@@ -12,22 +12,30 @@ import {
   View,
 } from "react-native";
 
+import { Video } from "expo-av";
+
 import { useUserProfile } from "../data/userProfile";
 import FadeWrapper from "./components/FadeWrapper";
 import IndoreBackground from "./components/IndoreBackground";
 
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { auth, db } from "../firebaseConfig";
+import { auth } from "../firebaseConfig";
 
 export default function ProfilePhotos() {
   const router = useRouter();
   const { user, saveProfile } = useUserProfile();
 
-  const [photos, setPhotos] = useState<string[]>(user?.photos || []);
-  const [loading, setLoading] = useState(false);
-
   if (!user) return null;
 
+  const [photos, setPhotos] = useState<string[]>(
+    user.photos && user.photos.length > 0
+      ? [...user.photos]
+      : ["", "", "", "", ""],
+  );
+
+  const [video, setVideo] = useState<string | null>(user.video || null);
+  const [loading, setLoading] = useState(false);
+
+  // ---------------- PICK IMAGE ----------------
   const pickImage = async (index: number) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -37,18 +45,45 @@ export default function ProfilePhotos() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
     });
 
     if (!result.canceled) {
-      const updated = [...photos];
-      updated[index] = result.assets[0].uri;
-      setPhotos(updated);
+      setPhotos((prev) => {
+        const updated = [...prev];
+        updated[index] = result.assets[0].uri;
+        return updated;
+      });
     }
   };
 
-  const uploadToFirebase = async (uri: string, uid: string, index: number) => {
+  // ---------------- PICK VIDEO ----------------
+  const pickVideo = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert("Permission required");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      videoMaxDuration: 30,
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setVideo(result.assets[0].uri);
+    }
+  };
+
+  // ---------------- UPLOAD ----------------
+  const uploadToFirebase = async (
+    uri: string,
+    path: string,
+    contentType: string,
+  ) => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) throw new Error("Not authenticated");
 
@@ -57,35 +92,36 @@ export default function ProfilePhotos() {
     const response = await fetch(uri);
     const blob = await response.blob();
 
-    const fileName = `photo_${index}_${Date.now()}.jpg`;
-
     const uploadUrl =
       `https://firebasestorage.googleapis.com/v0/b/indoridates.firebasestorage.app/o` +
-      `?name=users/${uid}/${fileName}`;
+      `?name=${path}`;
 
     const uploadResponse = await fetch(uploadUrl, {
       method: "POST",
       headers: {
-        "Content-Type": "image/jpeg",
+        "Content-Type": contentType,
         Authorization: `Bearer ${idToken}`,
       },
       body: blob,
     });
 
-    const data = await uploadResponse.json();
-
     if (!uploadResponse.ok) {
+      const data = await uploadResponse.json();
       throw new Error(JSON.stringify(data));
     }
 
-    return `https://firebasestorage.googleapis.com/v0/b/indoridates.firebasestorage.app/o/users%2F${uid}%2F${fileName}?alt=media`;
+    return `https://firebasestorage.googleapis.com/v0/b/indoridates.firebasestorage.app/o/${encodeURIComponent(
+      path,
+    )}?alt=media`;
   };
 
+  // ---------------- SAVE (FIXED LOGIC) ----------------
   const handleNext = async () => {
-    const validPhotos = photos.filter(Boolean);
+    // 1. Check valid photos (local ya web dono)
+    const validPhotosCount = photos.filter((p) => p && p.trim() !== "").length;
 
-    if (validPhotos.length < 3) {
-      Alert.alert("Upload at least 3 photos");
+    if (validPhotosCount < 3) {
+      Alert.alert("Error", "Kam se kam 3 photos upload karein");
       return;
     }
 
@@ -93,39 +129,50 @@ export default function ProfilePhotos() {
       setLoading(true);
 
       const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
-        Alert.alert("Authentication error");
-        return;
+      if (!firebaseUser) return;
+
+      const finalPhotoURLs: string[] = [];
+
+      for (let i = 0; i < photos.length; i++) {
+        const currentUri = photos[i];
+        if (!currentUri || currentUri.trim() === "") continue;
+
+        // Agar photo pehle se firebase par hai, upload skip karo
+        if (currentUri.startsWith("http")) {
+          finalPhotoURLs.push(currentUri);
+        } else {
+          // Nayi photo upload karo
+          const fileName = `users/${firebaseUser.uid}/photo_${i}_${Date.now()}.jpg`;
+          const url = await uploadToFirebase(
+            currentUri,
+            fileName,
+            "image/jpeg",
+          );
+          finalPhotoURLs.push(url);
+        }
       }
 
-      const uploadedPhotoURLs: string[] = [];
-
-      for (let i = 0; i < validPhotos.length; i++) {
-        const url = await uploadToFirebase(validPhotos[i], firebaseUser.uid, i);
-        uploadedPhotoURLs.push(url);
+      let finalVideoURL = video;
+      if (video && !video.startsWith("http")) {
+        const fileName = `users/${firebaseUser.uid}/video_${Date.now()}.mp4`;
+        finalVideoURL = await uploadToFirebase(video, fileName, "video/mp4");
       }
 
       const updatedUser = {
         ...user,
-        photos: uploadedPhotoURLs,
+        photos: finalPhotoURLs,
+        video: finalVideoURL,
       };
 
       await saveProfile(updatedUser);
 
-      await setDoc(
-        doc(db, "users", firebaseUser.uid),
-        {
-          ...updatedUser,
-          email: firebaseUser.email,
-          createdAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
-
-      router.replace("/(tabs)/home");
+      // Thoda wait taaki Firestore update reflect ho sake
+      setTimeout(() => {
+        router.replace("/(tabs)/home");
+      }, 1000);
     } catch (error: any) {
       console.log("UPLOAD ERROR:", error);
-      Alert.alert("Upload failed", error.message || "Unknown error");
+      Alert.alert("Upload failed", "Kuch galti hui hai, dobara try karein.");
     } finally {
       setLoading(false);
     }
@@ -136,7 +183,7 @@ export default function ProfilePhotos() {
       <FadeWrapper>
         <ScrollView contentContainerStyle={styles.container}>
           <View style={styles.glass}>
-            <Text style={styles.title}>Add Photos</Text>
+            <Text style={styles.title}>Add Photos (Min 3)</Text>
 
             <View style={styles.grid}>
               {[0, 1, 2, 3, 4].map((i) => (
@@ -153,6 +200,23 @@ export default function ProfilePhotos() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            <Text style={[styles.title, { marginTop: 20 }]}>
+              Add Intro Video (Optional)
+            </Text>
+
+            <TouchableOpacity style={styles.videoBox} onPress={pickVideo}>
+              {video ? (
+                <Video
+                  source={{ uri: video }}
+                  style={styles.video}
+                  isMuted
+                  shouldPlay={false}
+                />
+              ) : (
+                <Text style={styles.plus}>+</Text>
+              )}
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.nextBtn, loading && { opacity: 0.7 }]}
@@ -185,7 +249,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "white",
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 15,
@@ -204,6 +268,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  videoBox: {
+    width: "100%",
+    height: 150,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   plus: {
     fontSize: 24,
     color: "white",
@@ -213,11 +285,16 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 12,
   },
+  video: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 12,
+  },
   nextBtn: {
     backgroundColor: "#ff4d6d",
     padding: 14,
     borderRadius: 14,
-    marginTop: 12,
+    marginTop: 20,
     alignItems: "center",
   },
   nextText: {

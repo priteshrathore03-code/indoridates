@@ -1,4 +1,6 @@
 import { useRouter } from "expo-router";
+import { doc, getDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -6,15 +8,47 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { auth } from "../../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 import { useChatRooms } from "../../hooks/useChatRooms";
 import IndoreBackground from "../components/IndoreBackground";
 
+type UserMap = {
+  [key: string]: {
+    name?: string;
+  };
+};
+
 export default function ChatListScreen() {
   const router = useRouter();
-  const currentUserId = auth.currentUser?.uid || "";
+  const currentUserId = auth.currentUser?.uid ?? "";
 
   const { rooms } = useChatRooms(currentUserId);
+  const [usersMap, setUsersMap] = useState<UserMap>({});
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const map: UserMap = {};
+
+      for (const room of rooms) {
+        const otherUserId = room.users.find(
+          (id: string) => id !== currentUserId,
+        );
+
+        if (otherUserId && !map[otherUserId]) {
+          const snap = await getDoc(doc(db, "users", otherUserId));
+          if (snap.exists()) {
+            map[otherUserId] = snap.data() as { name?: string };
+          }
+        }
+      }
+
+      setUsersMap(map);
+    };
+
+    if (rooms.length > 0) {
+      fetchUsers();
+    }
+  }, [rooms, currentUserId]);
 
   return (
     <IndoreBackground>
@@ -22,20 +56,26 @@ export default function ChatListScreen() {
         <FlatList
           data={rooms}
           keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const otherUserId = item.users.find(
               (id: string) => id !== currentUserId,
             );
+
+            const otherUser =
+              otherUserId && usersMap[otherUserId]
+                ? usersMap[otherUserId]
+                : null;
 
             return (
               <TouchableOpacity
                 style={styles.room}
                 onPress={() => router.push(`/chat/${item.id}`)}
               >
-                <Text style={styles.name}>{otherUserId}</Text>
+                <Text style={styles.name}>{otherUser?.name ?? "User"}</Text>
 
                 <Text style={styles.lastMessage} numberOfLines={1}>
-                  {item.lastMessage?.text || "Start chatting..."}
+                  {item.lastMessage?.text ?? "Start chatting..."}
                 </Text>
               </TouchableOpacity>
             );

@@ -107,14 +107,17 @@ export default function Todo() {
     if (!plan.id) return;
 
     try {
+      console.log("ACCEPT CLICKED");
+      console.log("PLAN CREATED BY:", plan.createdBy);
+      console.log("REQUEST UID:", reqUid);
+
       const roomId = await createChatRoom(plan.createdBy, reqUid);
+
+      console.log("ROOM ID RETURNED:", roomId);
 
       await deletePlan(plan.id);
 
-      router.replace({
-        pathname: "/(tabs)/chat",
-        params: { roomId },
-      });
+      router.replace("/(tabs)/chat");
     } catch (error: any) {
       console.log("ACCEPT ERROR FULL:", error);
     }

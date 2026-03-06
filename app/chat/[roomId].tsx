@@ -24,14 +24,12 @@ export default function PersonalChatScreen() {
   const [input, setInput] = useState("");
   const flatListRef = useRef<FlatList>(null);
 
-  // Mark messages as seen
   useEffect(() => {
     if (roomId && currentUserId) {
       markMessagesAsSeen(roomId, currentUserId);
     }
   }, [roomId, messages.length]);
 
-  // Auto scroll to bottom
   useEffect(() => {
     flatListRef.current?.scrollToEnd({ animated: true });
   }, [messages.length]);

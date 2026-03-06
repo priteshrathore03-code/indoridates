@@ -46,7 +46,10 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
         const snap = await getDoc(doc(db, "users", firebaseUser.uid));
 
         if (snap.exists()) {
-          setUser(snap.data() as UserProfileState);
+          setUser({
+            uid: firebaseUser.uid,
+            ...(snap.data() as Omit<UserProfileState, "uid">),
+          });
         } else {
           // New user without profile yet
           setUser({

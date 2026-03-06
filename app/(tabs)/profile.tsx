@@ -61,11 +61,14 @@ export default function Profile() {
               {isOtherProfile ? "User Profile" : "My Profile"}
             </Text>
 
-            {viewUser.photos && viewUser.photos.length > 0 && (
+            {viewUser.photos?.filter((p: string) => p && p.trim() !== "")
+              .length > 0 && (
               <View style={styles.photoRow}>
-                {viewUser.photos.map((uri: string, index: number) => (
-                  <Image key={index} source={{ uri }} style={styles.photo} />
-                ))}
+                {viewUser.photos
+                  .filter((p: string) => p && p.trim() !== "")
+                  .map((uri: string, index: number) => (
+                    <Image key={index} source={{ uri }} style={styles.photo} />
+                  ))}
               </View>
             )}
 
