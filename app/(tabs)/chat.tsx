@@ -1,110 +1,179 @@
-import { useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
-  FlatList,
+  Image,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+
+import { useRouter } from "expo-router";
+
+import {
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
+
 import { auth, db } from "../../firebaseConfig";
-import { useChatRooms } from "../../hooks/useChatRooms";
-import IndoreBackground from "../components/IndoreBackground";
 
-type UserMap = {
-  [key: string]: {
-    name?: string;
-  };
-};
-
-export default function ChatListScreen() {
+export default function ChatTab() {
   const router = useRouter();
-  const currentUserId = auth.currentUser?.uid ?? "";
 
-  const { rooms } = useChatRooms(currentUserId);
-  const [usersMap, setUsersMap] = useState<UserMap>({});
+  const [likes, setLikes] = useState<any[]>([]);
+  const [chats, setChats] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      const map: UserMap = {};
+    const myUid = auth.currentUser?.uid;
+    if (!myUid) return;
 
-      for (const room of rooms) {
-        const otherUserId = room.users.find(
-          (id: string) => id !== currentUserId,
-        );
+    // 💖 Likes You
+    const qLikes = query(collection(db, "likes"), where("to", "==", myUid));
 
-        if (otherUserId && !map[otherUserId]) {
-          const snap = await getDoc(doc(db, "users", otherUserId));
-          if (snap.exists()) {
-            map[otherUserId] = snap.data() as { name?: string };
-          }
+    const unsubLikes = onSnapshot(qLikes, async (snap) => {
+      const arr: any[] = [];
+
+      for (const d of snap.docs) {
+        const data = d.data();
+
+        const userDoc = await getDoc(doc(db, "users", data.from));
+
+        if (userDoc.exists()) {
+          const u = userDoc.data();
+
+          arr.push({
+            id: data.from,
+            name: u.name,
+            photo: u.photos?.[0] || "",
+          });
         }
       }
 
-      setUsersMap(map);
-    };
+      setLikes(arr);
+    });
 
-    if (rooms.length > 0) {
-      fetchUsers();
-    }
-  }, [rooms, currentUserId]);
+    // 💬 Chats (Matches)
+    const qChats = query(
+      collection(db, "chatRooms"),
+      where("users", "array-contains", myUid),
+    );
+
+    const unsubChats = onSnapshot(qChats, async (snap) => {
+      const arr: any[] = [];
+
+      for (const d of snap.docs) {
+        const data = d.data();
+
+        const otherUser = data.users.find((p: string) => p !== myUid);
+
+        const userDoc = await getDoc(doc(db, "users", otherUser));
+
+        if (userDoc.exists()) {
+          const u = userDoc.data();
+
+          arr.push({
+            id: d.id,
+            name: u.name,
+            photo: u.photos?.[0] || "",
+          });
+        }
+      }
+
+      setChats(arr);
+    });
+
+    return () => {
+      unsubLikes();
+      unsubChats();
+    };
+  }, []);
 
   return (
-    <IndoreBackground>
-      <View style={styles.container}>
-        <FlatList
-          data={rooms}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => {
-            const otherUserId = item.users.find(
-              (id: string) => id !== currentUserId,
-            );
+    <View style={styles.container}>
+      <ScrollView>
+        <Text style={styles.title}>💖 Likes You</Text>
 
-            const otherUser =
-              otherUserId && usersMap[otherUserId]
-                ? usersMap[otherUserId]
-                : null;
+        {likes.map((u, index) => (
+          <View key={u.id + "_" + index} style={styles.card}>
+            <Image source={{ uri: u.photo }} style={styles.photo} />
 
-            return (
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>{u.name}</Text>
+
               <TouchableOpacity
-                style={styles.room}
-                onPress={() => router.push(`/chat/${item.id}`)}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(tabs)/home",
+                    params: { viewUser: u.id },
+                  })
+                }
               >
-                <Text style={styles.name}>{otherUser?.name ?? "User"}</Text>
-
-                <Text style={styles.lastMessage} numberOfLines={1}>
-                  {item.lastMessage?.text ?? "Start chatting..."}
-                </Text>
+                <Text style={styles.view}>View Profile</Text>
               </TouchableOpacity>
-            );
-          }}
-        />
-      </View>
-    </IndoreBackground>
+            </View>
+          </View>
+        ))}
+
+        <Text style={[styles.title, { marginTop: 30 }]}>💬 Matches</Text>
+
+        {chats.map((c) => (
+          <TouchableOpacity
+            key={c.id}
+            style={styles.card}
+            onPress={() => router.push("/chat/" + c.id)}
+          >
+            <Image source={{ uri: c.photo }} style={styles.photo} />
+
+            <Text style={styles.name}>{c.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 60,
-    paddingHorizontal: 16,
+    backgroundColor: "#000",
+    padding: 16,
   },
-  room: {
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: "600",
+
+  title: {
+    fontSize: 22,
     color: "white",
+    fontWeight: "bold",
+    marginBottom: 10,
   },
-  lastMessage: {
-    fontSize: 14,
-    color: "#ccc",
+
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#111",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+
+  photo: {
+    width: 55,
+    height: 55,
+    borderRadius: 28,
+    marginRight: 12,
+  },
+
+  name: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+
+  view: {
+    color: "#4da6ff",
     marginTop: 4,
   },
 });

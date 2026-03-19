@@ -158,13 +158,10 @@ export default function ProfilePhotos() {
         finalVideoURL = await uploadToFirebase(video, fileName, "video/mp4");
       }
 
-      const updatedUser = {
-        ...user,
+      await saveProfile({
         photos: finalPhotoURLs,
         video: finalVideoURL,
-      };
-
-      await saveProfile(updatedUser);
+      });
 
       // Thoda wait taaki Firestore update reflect ho sake
       setTimeout(() => {

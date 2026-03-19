@@ -105,13 +105,9 @@ export default function EditProfile() {
 
   return (
     <IndoreBackground>
-      {" "}
       <FadeWrapper>
-        {" "}
         <ScrollView contentContainerStyle={styles.container}>
-          {" "}
           <View style={styles.card}>
-            {" "}
             <Text style={styles.title}>Edit Profile</Text>
             <TextInput
               placeholder="Name"

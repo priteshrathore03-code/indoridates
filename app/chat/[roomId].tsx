@@ -1,5 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -10,94 +9,112 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { auth } from "../../firebaseConfig";
-import { useMessages } from "../../hooks/useMessages";
-import { markMessagesAsSeen, sendMessage } from "../../services/chatService";
 
-export default function PersonalChatScreen() {
-  const { roomId } = useLocalSearchParams<{ roomId: string }>();
-  const currentUserId = auth.currentUser?.uid || "";
-  const insets = useSafeAreaInsets();
+import { useLocalSearchParams, useRouter } from "expo-router";
 
-  const { messages } = useMessages(roomId || "");
-  const [input, setInput] = useState("");
-  const flatListRef = useRef<FlatList>(null);
+import {
+  addDoc,
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  where,
+} from "firebase/firestore";
+
+import { auth, db } from "../../firebaseConfig";
+
+export default function ChatRoom() {
+  const router = useRouter();
+  const { roomId } = useLocalSearchParams();
+
+  const [messages, setMessages] = useState<any[]>([]);
+  const [text, setText] = useState("");
+
+  const myUid = auth.currentUser?.uid;
 
   useEffect(() => {
-    if (roomId && currentUserId) {
-      markMessagesAsSeen(roomId, currentUserId);
-    }
-  }, [roomId, messages.length]);
-
-  useEffect(() => {
-    flatListRef.current?.scrollToEnd({ animated: true });
-  }, [messages.length]);
-
-  const handleSend = async () => {
-    if (!input.trim()) return;
     if (!roomId) return;
 
-    await sendMessage(roomId, currentUserId, input.trim());
-    setInput("");
+    const q = query(
+      collection(db, "messages"),
+      where("roomId", "==", String(roomId)),
+      orderBy("createdAt", "asc"),
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const arr: any[] = [];
+
+      snap.forEach((d) => {
+        arr.push({
+          id: d.id,
+          ...d.data(),
+        });
+      });
+
+      setMessages(arr);
+    });
+
+    return () => unsub();
+  }, [roomId]);
+
+  const sendMessage = async () => {
+    if (!text.trim()) return;
+    if (!myUid) return;
+
+    await addDoc(collection(db, "messages"), {
+      roomId: String(roomId),
+      senderId: myUid,
+      text,
+      createdAt: serverTimestamp(),
+    });
+
+    setText("");
   };
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: "#000" }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={80}
     >
       <View style={styles.container}>
+        {/* HEADER */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.replace("/(tabs)/chat")}>
+            <Text style={{ color: "white", fontSize: 16 }}>← Back</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* MESSAGES */}
         <FlatList
-          ref={flatListRef}
           data={messages}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{
-            padding: 16,
-            paddingBottom: 20,
-          }}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => {
-            const isMine = item.senderId === currentUserId;
-
-            return (
-              <View
-                style={[
-                  styles.message,
-                  isMine ? styles.myMessage : styles.otherMessage,
-                ]}
-              >
-                <Text style={{ color: isMine ? "white" : "black" }}>
-                  {item.text}
-                </Text>
-
-                {isMine && item.seenBy?.length > 1 && (
-                  <Text style={styles.seen}>✓✓</Text>
-                )}
-              </View>
-            );
-          }}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          renderItem={({ item }) => (
+            <View
+              style={[
+                styles.msg,
+                item.senderId === myUid ? styles.myMsg : styles.otherMsg,
+              ]}
+            >
+              <Text style={{ color: "white" }}>{item.text}</Text>
+            </View>
+          )}
         />
 
-        <View
-          style={[
-            styles.inputRow,
-            {
-              paddingBottom: insets.bottom > 0 ? insets.bottom + 10 : 20,
-            },
-          ]}
-        >
+        {/* INPUT */}
+        <View style={styles.inputRow}>
           <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder="Type a message..."
-            placeholderTextColor="#888"
+            value={text}
+            onChangeText={setText}
+            placeholder="Type message..."
+            placeholderTextColor="#aaa"
             style={styles.input}
           />
 
-          <TouchableOpacity onPress={handleSend} style={styles.sendBtn}>
-            <Text style={{ color: "white", fontWeight: "600" }}>Send</Text>
+          <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
+            <Text style={{ color: "white" }}>Send</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -108,56 +125,53 @@ export default function PersonalChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#111",
   },
 
-  message: {
+  header: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderColor: "#333",
+  },
+
+  msg: {
     padding: 10,
-    borderRadius: 12,
-    marginBottom: 8,
-    maxWidth: "75%",
+    margin: 8,
+    borderRadius: 10,
+    maxWidth: "70%",
   },
 
-  myMessage: {
-    backgroundColor: "#4f46e5",
+  myMsg: {
+    backgroundColor: "#ff4d6d",
     alignSelf: "flex-end",
   },
 
-  otherMessage: {
-    backgroundColor: "#eee",
+  otherMsg: {
+    backgroundColor: "#333",
     alignSelf: "flex-start",
-  },
-
-  seen: {
-    fontSize: 10,
-    marginTop: 4,
-    color: "#ccc",
-    alignSelf: "flex-end",
   },
 
   inputRow: {
     flexDirection: "row",
-    paddingHorizontal: 12,
-    paddingTop: 10,
+    padding: 10,
+    paddingBottom: 30,
     borderTopWidth: 1,
-    borderColor: "#222",
-    backgroundColor: "#111",
+    borderColor: "#333",
+    backgroundColor: "#000",
   },
 
   input: {
     flex: 1,
-    backgroundColor: "#222",
+    backgroundColor: "#111",
     color: "white",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
+    padding: 12,
+    borderRadius: 10,
   },
 
   sendBtn: {
-    marginLeft: 10,
-    backgroundColor: "#4f46e5",
+    backgroundColor: "#ff4d6d",
     paddingHorizontal: 18,
     justifyContent: "center",
-    borderRadius: 20,
+    marginLeft: 8,
+    borderRadius: 10,
   },
 });
