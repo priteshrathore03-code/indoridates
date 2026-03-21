@@ -21,6 +21,10 @@ import {
 
 import { auth, db } from "../../firebaseConfig";
 
+// 🔥 ADD THESE
+import FadeWrapper from "../components/FadeWrapper";
+import IndoreBackground from "../components/IndoreBackground";
+
 export default function ChatTab() {
   const router = useRouter();
 
@@ -31,7 +35,6 @@ export default function ChatTab() {
     const myUid = auth.currentUser?.uid;
     if (!myUid) return;
 
-    // 💖 Likes You
     const qLikes = query(collection(db, "likes"), where("to", "==", myUid));
 
     const unsubLikes = onSnapshot(qLikes, async (snap) => {
@@ -56,7 +59,6 @@ export default function ChatTab() {
       setLikes(arr);
     });
 
-    // 💬 Chats (Matches)
     const qChats = query(
       collection(db, "chatRooms"),
       where("users", "array-contains", myUid),
@@ -93,53 +95,56 @@ export default function ChatTab() {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <ScrollView>
-        <Text style={styles.title}>💖 Likes You</Text>
+    <IndoreBackground>
+      <FadeWrapper>
+        <ScrollView style={styles.container}>
+          {/* 💖 Likes */}
+          <Text style={styles.title}>💖 Likes You</Text>
 
-        {likes.map((u, index) => (
-          <View key={u.id + "_" + index} style={styles.card}>
-            <Image source={{ uri: u.photo }} style={styles.photo} />
+          {likes.map((u, index) => (
+            <View key={u.id + "_" + index} style={styles.card}>
+              <Image source={{ uri: u.photo }} style={styles.photo} />
 
-            <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{u.name}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.name}>{u.name}</Text>
 
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: "/(tabs)/home",
-                    params: { viewUser: u.id },
-                  })
-                }
-              >
-                <Text style={styles.view}>View Profile</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(tabs)/home",
+                      params: { viewUser: u.id },
+                    })
+                  }
+                >
+                  <Text style={styles.view}>View Profile</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        ))}
+          ))}
 
-        <Text style={[styles.title, { marginTop: 30 }]}>💬 Matches</Text>
+          {/* 💬 Matches */}
+          <Text style={[styles.title, { marginTop: 30 }]}>💬 Matches</Text>
 
-        {chats.map((c) => (
-          <TouchableOpacity
-            key={c.id}
-            style={styles.card}
-            onPress={() => router.push("/chat/" + c.id)}
-          >
-            <Image source={{ uri: c.photo }} style={styles.photo} />
+          {chats.map((c) => (
+            <TouchableOpacity
+              key={c.id}
+              style={styles.card}
+              onPress={() => router.push("/chat/" + c.id)}
+            >
+              <Image source={{ uri: c.photo }} style={styles.photo} />
 
-            <Text style={styles.name}>{c.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
+              <Text style={styles.name}>{c.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </FadeWrapper>
+    </IndoreBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
     padding: 16,
   },
 
@@ -153,9 +158,9 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#111",
+    backgroundColor: "rgba(0,0,0,0.6)",
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 15,
     marginBottom: 10,
   },
 

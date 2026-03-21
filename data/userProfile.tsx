@@ -7,6 +7,9 @@ import {
   useEffect,
   useState,
 } from "react";
+
+import * as Location from "expo-location"; // 🔥 IMPORTANT
+
 import { auth, db } from "../firebaseConfig";
 
 export type UserProfileState = {
@@ -18,6 +21,9 @@ export type UserProfileState = {
   bio?: string;
   photos?: string[];
   video?: string | null;
+
+  latitude?: number;
+  longitude?: number;
 };
 
 type UserContextType = {
@@ -33,7 +39,6 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfileState | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
@@ -48,16 +53,13 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
         if (snap.exists()) {
           setUser({
             uid: firebaseUser.uid,
-            ...(snap.data() as Omit<UserProfileState, "uid">),
+            ...(snap.data() as any),
           });
         } else {
-          // New user without profile yet
-          setUser({
-            uid: firebaseUser.uid,
-          });
+          setUser({ uid: firebaseUser.uid });
         }
-      } catch (error) {
-        console.log("USER FETCH ERROR:", error);
+      } catch (e) {
+        console.log("USER FETCH ERROR:", e);
       } finally {
         setLoading(false);
       }
@@ -66,18 +68,34 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
     return unsubscribe;
   }, []);
 
-  // 🔥 SIMPLE & SAFE saveProfile
+  // 🔥 SAVE PROFILE + REAL LOCATION
   const saveProfile = async (profile: Partial<UserProfileState>) => {
     if (!auth.currentUser) return;
 
     const uid = auth.currentUser.uid;
 
     try {
+      // 🔥 PERMISSION
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      let latitude = profile.latitude;
+      let longitude = profile.longitude;
+
+      if (status === "granted") {
+        const loc = await Location.getCurrentPositionAsync({});
+        latitude = loc.coords.latitude;
+        longitude = loc.coords.longitude;
+
+        console.log("LOCATION SAVED:", latitude, longitude); // 🔥 debug
+      }
+
       await setDoc(
         doc(db, "users", uid),
         {
           uid,
           ...profile,
+          latitude,
+          longitude,
         },
         { merge: true },
       );
@@ -85,10 +103,11 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
       setUser((prev) => ({
         ...(prev || { uid }),
         ...profile,
+        latitude,
+        longitude,
       }));
     } catch (error) {
       console.log("SAVE PROFILE ERROR:", error);
-      throw error;
     }
   };
 
@@ -98,14 +117,7 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <UserContext.Provider
-      value={{
-        user,
-        loading,
-        saveProfile,
-        logout,
-      }}
-    >
+    <UserContext.Provider value={{ user, loading, saveProfile, logout }}>
       {children}
     </UserContext.Provider>
   );
@@ -113,10 +125,6 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
 
 export const useUserProfile = () => {
   const context = useContext(UserContext);
-
-  if (!context) {
-    throw new Error("useUserProfile must be used inside UserProfileProvider");
-  }
-
+  if (!context) throw new Error("useUserProfile must be used inside provider");
   return context;
 };

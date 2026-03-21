@@ -2,12 +2,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { db } from "../../firebaseConfig";
 import FadeWrapper from "../components/FadeWrapper";
@@ -17,6 +18,10 @@ export default function PublicProfile() {
   const { uid } = useLocalSearchParams();
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
+
+  // 🔥 NEW STATE (important)
+  const [showImage, setShowImage] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -40,11 +45,19 @@ export default function PublicProfile() {
           <View style={styles.card}>
             <Text style={styles.title}>User Profile</Text>
 
-            {/* 🔥 Show ALL photos */}
+            {/* 🔥 UPDATED PHOTOS CLICKABLE */}
             {profile.photos?.length > 0 && (
               <View style={styles.photoRow}>
                 {profile.photos.map((uri: string, index: number) => (
-                  <Image key={index} source={{ uri }} style={styles.photo} />
+                  <TouchableOpacity
+                    key={index}
+                    onPress={() => {
+                      setSelectedImage(uri);
+                      setShowImage(true);
+                    }}
+                  >
+                    <Image source={{ uri }} style={styles.photo} />
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
@@ -69,6 +82,25 @@ export default function PublicProfile() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        {/* 🔥 FULL SCREEN IMAGE MODAL */}
+        <Modal visible={showImage} transparent animationType="fade">
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              backgroundColor: "black",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+            onPress={() => setShowImage(false)}
+          >
+            <Image
+              source={{ uri: selectedImage! }}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </Modal>
       </FadeWrapper>
     </IndoreBackground>
   );

@@ -11,6 +11,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
 import { createChatRoom } from "../../data/chatStore";
 import {
   addPlan,
@@ -36,7 +38,6 @@ export default function Todo() {
   const [time, setTime] = useState("");
   const [brief, setBrief] = useState("");
 
-  // 🔥 REALTIME LISTENER
   useEffect(() => {
     const unsubscribe = listenPlans(async (data) => {
       setPlans(data);
@@ -107,19 +108,11 @@ export default function Todo() {
     if (!plan.id) return;
 
     try {
-      console.log("ACCEPT CLICKED");
-      console.log("PLAN CREATED BY:", plan.createdBy);
-      console.log("REQUEST UID:", reqUid);
-
       const roomId = await createChatRoom(plan.createdBy, reqUid);
-
-      console.log("ROOM ID RETURNED:", roomId);
-
       await deletePlan(plan.id);
-
       router.replace("/(tabs)/chat");
-    } catch (error: any) {
-      console.log("ACCEPT ERROR FULL:", error);
+    } catch (error) {
+      console.log(error);
     }
   };
 
@@ -130,143 +123,159 @@ export default function Todo() {
   return (
     <IndoreBackground>
       <FadeWrapper>
-        <ScrollView style={styles.container}>
-          {isFemale && (
-            <>
-              <TouchableOpacity
-                style={styles.createBtn}
-                onPress={() => setShowForm(!showForm)}
-              >
-                <Text style={styles.btnText}>
-                  {showForm ? "Cancel" : "Create Plan"}
-                </Text>
-              </TouchableOpacity>
+        <SafeAreaView style={{ flex: 1 }}>
+          <ScrollView style={styles.container}>
+            {/* 👩 FEMALE CREATE PLAN */}
+            {isFemale && (
+              <>
+                <TouchableOpacity
+                  style={styles.createBtn}
+                  onPress={() => setShowForm(!showForm)}
+                >
+                  <Text style={styles.btnText}>
+                    {showForm ? "Cancel" : "Create Plan"}
+                  </Text>
+                </TouchableOpacity>
 
-              {showForm && (
-                <View style={styles.form}>
-                  <TextInput
-                    placeholder="Title"
-                    style={styles.input}
-                    value={title}
-                    onChangeText={setTitle}
-                  />
-                  <TextInput
-                    placeholder="Time"
-                    style={styles.input}
-                    value={time}
-                    onChangeText={setTime}
-                  />
-                  <TextInput
-                    placeholder="Brief"
-                    style={styles.input}
-                    value={brief}
-                    onChangeText={setBrief}
-                  />
-                  <TouchableOpacity
-                    style={styles.saveBtn}
-                    onPress={handleCreate}
-                  >
-                    <Text style={styles.btnText}>Save</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </>
-          )}
-
-          {plans.map((plan) => {
-            const creator = usersMap[plan.createdBy];
-            const alreadyRequested = plan.requests.includes(user.uid);
-
-            return (
-              <View key={plan.id} style={styles.card}>
-                {creator && (
-                  <View style={styles.profileRow}>
-                    <Image
-                      source={{ uri: creator.photos?.[0] }}
-                      style={styles.profileImage}
+                {showForm && (
+                  <View style={styles.form}>
+                    <TextInput
+                      placeholder="Title"
+                      style={styles.input}
+                      value={title}
+                      onChangeText={setTitle}
                     />
-                    <Text style={styles.name}>{creator.name}</Text>
+                    <TextInput
+                      placeholder="Time"
+                      style={styles.input}
+                      value={time}
+                      onChangeText={setTime}
+                    />
+                    <TextInput
+                      placeholder="Brief"
+                      style={styles.input}
+                      value={brief}
+                      onChangeText={setBrief}
+                    />
+                    <TouchableOpacity
+                      style={styles.saveBtn}
+                      onPress={handleCreate}
+                    >
+                      <Text style={styles.btnText}>Save</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
+              </>
+            )}
 
-                <Text style={styles.title}>{plan.title}</Text>
-                <Text style={styles.time}>{plan.time}</Text>
-                <Text style={styles.brief}>{plan.brief}</Text>
+            {/* 🔥 FIXED FILTER */}
+            {plans
+              .filter((plan) => {
+                if (isFemale) return plan.createdBy === user.uid;
+                if (isMale) return plan.createdBy !== user.uid;
+                return true;
+              })
+              .map((plan) => {
+                const creator = usersMap[plan.createdBy];
+                const alreadyRequested = plan.requests.includes(user.uid);
 
-                {plan.createdBy !== user.uid && (
-                  <TouchableOpacity
-                    style={styles.viewBtn}
-                    onPress={() => router.push(`/user/${plan.createdBy}`)}
-                  >
-                    <Text style={styles.btnText}>View Profile</Text>
-                  </TouchableOpacity>
-                )}
+                return (
+                  <View key={plan.id} style={styles.card}>
+                    {creator && (
+                      <View style={styles.profileRow}>
+                        <Image
+                          source={{ uri: creator.photos?.[0] }}
+                          style={styles.profileImage}
+                        />
+                        <Text style={styles.name}>{creator.name}</Text>
+                      </View>
+                    )}
 
-                {isFemale && plan.createdBy === user.uid && (
-                  <>
-                    <TouchableOpacity
-                      style={styles.deleteBtn}
-                      onPress={() => handleDelete(plan.id!)}
-                    >
-                      <Text style={styles.btnText}>Delete</Text>
-                    </TouchableOpacity>
+                    <Text style={styles.title}>{plan.title}</Text>
+                    <Text style={styles.time}>{plan.time}</Text>
+                    <Text style={styles.brief}>{plan.brief}</Text>
 
-                    {plan.requests.map((reqUid) => {
-                      const reqUser = usersMap[reqUid];
-                      return (
-                        <View key={reqUid} style={styles.requestBox}>
-                          {reqUser && (
-                            <>
-                              <Text style={{ color: "white" }}>
-                                {reqUser.name}
-                              </Text>
+                    {plan.createdBy !== user.uid && (
+                      <TouchableOpacity
+                        style={styles.viewBtn}
+                        onPress={() => router.push(`/user/${plan.createdBy}`)}
+                      >
+                        <Text style={styles.btnText}>View Profile</Text>
+                      </TouchableOpacity>
+                    )}
 
-                              <TouchableOpacity
-                                style={styles.viewBtn}
-                                onPress={() => router.push(`/user/${reqUid}`)}
-                              >
-                                <Text style={styles.btnText}>View Profile</Text>
-                              </TouchableOpacity>
+                    {/* 👩 FEMALE OWN PLAN */}
+                    {isFemale && plan.createdBy === user.uid && (
+                      <>
+                        <TouchableOpacity
+                          style={styles.deleteBtn}
+                          onPress={() => handleDelete(plan.id!)}
+                        >
+                          <Text style={styles.btnText}>Delete</Text>
+                        </TouchableOpacity>
 
-                              <TouchableOpacity
-                                style={styles.acceptBtn}
-                                onPress={() => handleAccept(plan, reqUid)}
-                              >
-                                <Text style={styles.btnText}>Accept</Text>
-                              </TouchableOpacity>
-                            </>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </>
-                )}
+                        {plan.requests.map((reqUid) => {
+                          const reqUser = usersMap[reqUid];
+                          return (
+                            <View key={reqUid} style={styles.requestBox}>
+                              {reqUser && (
+                                <>
+                                  <Text style={{ color: "white" }}>
+                                    {reqUser.name}
+                                  </Text>
 
-                {isMale &&
-                  plan.createdBy !== user.uid &&
-                  (alreadyRequested ? (
-                    <Text style={{ color: "yellow", marginTop: 10 }}>
-                      Request Sent
-                    </Text>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.interestBtn}
-                      onPress={() => handleInterested(plan)}
-                    >
-                      <Text style={styles.btnText}>Interested</Text>
-                    </TouchableOpacity>
-                  ))}
-              </View>
-            );
-          })}
-        </ScrollView>
+                                  <TouchableOpacity
+                                    style={styles.viewBtn}
+                                    onPress={() =>
+                                      router.push(`/user/${reqUid}`)
+                                    }
+                                  >
+                                    <Text style={styles.btnText}>
+                                      View Profile
+                                    </Text>
+                                  </TouchableOpacity>
+
+                                  <TouchableOpacity
+                                    style={styles.acceptBtn}
+                                    onPress={() => handleAccept(plan, reqUid)}
+                                  >
+                                    <Text style={styles.btnText}>Accept</Text>
+                                  </TouchableOpacity>
+                                </>
+                              )}
+                            </View>
+                          );
+                        })}
+                      </>
+                    )}
+
+                    {/* 👨 MALE */}
+                    {isMale &&
+                      plan.createdBy !== user.uid &&
+                      (alreadyRequested ? (
+                        <Text style={{ color: "yellow", marginTop: 10 }}>
+                          Request Sent
+                        </Text>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.interestBtn}
+                          onPress={() => handleInterested(plan)}
+                        >
+                          <Text style={styles.btnText}>Interested</Text>
+                        </TouchableOpacity>
+                      ))}
+                  </View>
+                );
+              })}
+          </ScrollView>
+        </SafeAreaView>
       </FadeWrapper>
     </IndoreBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 10 },
+  container: { flex: 1, padding: 10, paddingTop: 20 },
   createBtn: {
     backgroundColor: "purple",
     padding: 12,
