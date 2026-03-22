@@ -40,8 +40,20 @@ export default function Todo() {
 
   useEffect(() => {
     const unsubscribe = listenPlans(async (data) => {
-      setPlans(data);
-      await fetchUsers(data);
+      const now = Date.now();
+      const twoHours = 2 * 60 * 60 * 1000;
+
+      // 🔥 AUTO DELETE 2 HOURS
+      const filtered = data.filter((plan) => {
+        if (plan.createdAt && now - plan.createdAt > twoHours) {
+          deletePlan(plan.id!);
+          return false;
+        }
+        return true;
+      });
+
+      setPlans(filtered);
+      await fetchUsers(filtered);
     });
 
     return () => unsubscribe();
@@ -72,9 +84,21 @@ export default function Todo() {
   const isFemale = user.gender === "female";
   const isMale = user.gender === "male";
 
+  // 🔥 CREATE PLAN LIMIT (2 per day)
   const handleCreate = async () => {
     if (!title || !time || !brief) {
       Alert.alert("Fill all fields");
+      return;
+    }
+
+    const today = new Date().setHours(0, 0, 0, 0);
+
+    const myPlansToday = plans.filter(
+      (p) => p.createdBy === user.uid && p.createdAt && p.createdAt >= today,
+    );
+
+    if (myPlansToday.length >= 2) {
+      Alert.alert("Only 2 plans allowed per day");
       return;
     }
 
@@ -95,9 +119,25 @@ export default function Todo() {
     setShowForm(false);
   };
 
+  // 🔥 MALE INTEREST LIMIT
   const handleInterested = async (plan: PlanType) => {
     if (!plan.id) return;
     if (plan.requests.includes(user.uid)) return;
+
+    const isPremium = false;
+
+    const myRequests = plans.filter((p) => p.requests.includes(user.uid));
+
+    const limit = isPremium ? 5 : 2;
+
+    if (myRequests.length >= limit) {
+      Alert.alert(
+        isPremium
+          ? "Limit reached (5)"
+          : "Upgrade to premium for more interests",
+      );
+      return;
+    }
 
     await updatePlan(plan.id, {
       requests: [...plan.requests, user.uid],
@@ -125,7 +165,6 @@ export default function Todo() {
       <FadeWrapper>
         <SafeAreaView style={{ flex: 1 }}>
           <ScrollView style={styles.container}>
-            {/* 👩 FEMALE CREATE PLAN */}
             {isFemale && (
               <>
                 <TouchableOpacity
@@ -168,7 +207,6 @@ export default function Todo() {
               </>
             )}
 
-            {/* 🔥 FIXED FILTER */}
             {plans
               .filter((plan) => {
                 if (isFemale) return plan.createdBy === user.uid;
@@ -204,7 +242,6 @@ export default function Todo() {
                       </TouchableOpacity>
                     )}
 
-                    {/* 👩 FEMALE OWN PLAN */}
                     {isFemale && plan.createdBy === user.uid && (
                       <>
                         <TouchableOpacity
@@ -249,7 +286,6 @@ export default function Todo() {
                       </>
                     )}
 
-                    {/* 👨 MALE */}
                     {isMale &&
                       plan.createdBy !== user.uid &&
                       (alreadyRequested ? (
