@@ -59,7 +59,15 @@ export default function Profile() {
         <ScrollView contentContainerStyle={styles.container}>
           <View style={styles.card}>
             {isOtherProfile && (
-              <TouchableOpacity onPress={() => router.back()}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.replace("/(tabs)/home");
+                  }
+                }}
+              >
                 <Text style={styles.backText}>← Back</Text>
               </TouchableOpacity>
             )}

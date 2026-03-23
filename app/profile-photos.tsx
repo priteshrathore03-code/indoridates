@@ -1,5 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
+import { doc, getDoc, increment, updateDoc } from "firebase/firestore";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -11,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { db } from "../firebaseConfig";
 
 import { Video } from "expo-av";
 
@@ -19,6 +21,9 @@ import FadeWrapper from "./components/FadeWrapper";
 import IndoreBackground from "./components/IndoreBackground";
 
 import { auth } from "../firebaseConfig";
+
+// 🔥 IMPORTANT IMPORT (ab use ho raha hai, delete nahi hoga)
+import { checkImageSafety } from "../data/imageSafety";
 
 export default function ProfilePhotos() {
   const router = useRouter();
@@ -115,9 +120,8 @@ export default function ProfilePhotos() {
     )}?alt=media`;
   };
 
-  // ---------------- SAVE (FIXED LOGIC) ----------------
+  // ---------------- SAVE ----------------
   const handleNext = async () => {
-    // 1. Check valid photos (local ya web dono)
     const validPhotosCount = photos.filter((p) => p && p.trim() !== "").length;
 
     if (validPhotosCount < 3) {
@@ -137,17 +141,62 @@ export default function ProfilePhotos() {
         const currentUri = photos[i];
         if (!currentUri || currentUri.trim() === "") continue;
 
-        // Agar photo pehle se firebase par hai, upload skip karo
         if (currentUri.startsWith("http")) {
           finalPhotoURLs.push(currentUri);
         } else {
-          // Nayi photo upload karo
           const fileName = `users/${firebaseUser.uid}/photo_${i}_${Date.now()}.jpg`;
+
           const url = await uploadToFirebase(
             currentUri,
             fileName,
             "image/jpeg",
           );
+
+          // 🔥 BACKGROUND CHECK (no delay)
+          checkImageSafety(url)
+            .then(async (check) => {
+              if (!check?.ok) {
+                console.log("Bad image:", url);
+
+                const userId = auth.currentUser?.uid;
+                if (!userId) return;
+
+                const userRef = doc(db, "users", userId);
+
+                // ⚠️ warning +1
+                await updateDoc(userRef, {
+                  warnings: increment(1),
+                });
+
+                // 📥 latest data lao
+                const snap = await getDoc(userRef);
+                const data = snap.data();
+
+                // ❌ photo remove
+                const updatedPhotos = (data?.photos || []).filter(
+                  (p: string) => p !== url,
+                );
+
+                await updateDoc(userRef, {
+                  photos: updatedPhotos,
+                });
+
+                Alert.alert("Warning ⚠️", "Inappropriate photo removed");
+
+                // 🚫 BAN LOGIC
+                if ((data?.warnings || 0) + 1 >= 3) {
+                  await updateDoc(userRef, {
+                    banned: true,
+                  });
+
+                  Alert.alert("Account Blocked 🚫", "Too many violations");
+                }
+              }
+            })
+            .catch((err) => {
+              console.log("Safety error:", err);
+            });
+
           finalPhotoURLs.push(url);
         }
       }
@@ -157,13 +206,20 @@ export default function ProfilePhotos() {
         const fileName = `users/${firebaseUser.uid}/video_${Date.now()}.mp4`;
         finalVideoURL = await uploadToFirebase(video, fileName, "video/mp4");
       }
-
+      // 🔥 FINAL VALIDATION (IMPORTANT)
+      if (finalPhotoURLs.length < 3) {
+        Alert.alert(
+          "Error",
+          "3 valid photos required (invalid photos removed)",
+        );
+        setLoading(false);
+        return;
+      }
       await saveProfile({
         photos: finalPhotoURLs,
         video: finalVideoURL,
       });
 
-      // Thoda wait taaki Firestore update reflect ho sake
       setTimeout(() => {
         router.replace("/(tabs)/home");
       }, 1000);
