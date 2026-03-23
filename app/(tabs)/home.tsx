@@ -14,11 +14,14 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import {
   addDoc,
+  arrayUnion,
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   setDoc,
+  updateDoc,
   where,
 } from "firebase/firestore";
 
@@ -42,12 +45,20 @@ export default function Home() {
       const currentUid = auth.currentUser?.uid;
       if (!currentUid || !currentUser) return;
 
+      const userSnap = await getDoc(doc(db, "users", currentUid));
+      const userData = userSnap.data();
+
+      const liked = userData?.liked || [];
+      const disliked = userData?.disliked || [];
+
       const snap = await getDocs(collection(db, "users"));
 
       const list: any[] = [];
 
       snap.forEach((docSnap) => {
         if (docSnap.id === currentUid) return;
+
+        if (liked.includes(docSnap.id) || disliked.includes(docSnap.id)) return;
 
         const data = docSnap.data();
 
@@ -78,7 +89,6 @@ export default function Home() {
     loadUsers();
   }, [currentUser]);
 
-  // 🔥 correct user (view profile + normal)
   const user = viewUser
     ? users.find((u) => u.id === viewUser)
     : users[currentIndex];
@@ -89,19 +99,20 @@ export default function Home() {
     setMediaIndex(0);
   };
 
-  // 🔥 LIKE + MATCH + CHAT (RESTORED)
   const handleLike = async () => {
     const target = user;
     const myUid = auth.currentUser?.uid;
     if (!target || !myUid) return;
 
-    // save like
+    await updateDoc(doc(db, "users", myUid), {
+      liked: arrayUnion(target.id),
+    });
+
     await addDoc(collection(db, "likes"), {
       from: myUid,
       to: target.id,
     });
 
-    // check match
     const q = query(
       collection(db, "likes"),
       where("from", "==", target.id),
@@ -129,7 +140,15 @@ export default function Home() {
     nextUser();
   };
 
-  const handleDislike = () => {
+  const handleDislike = async () => {
+    const target = user;
+    const myUid = auth.currentUser?.uid;
+    if (!target || !myUid) return;
+
+    await updateDoc(doc(db, "users", myUid), {
+      disliked: arrayUnion(target.id),
+    });
+
     nextUser();
   };
 
@@ -183,7 +202,6 @@ export default function Home() {
               />
             )}
 
-            {/* tap left/right */}
             <View style={styles.tapContainer}>
               <TouchableOpacity
                 style={{ flex: 1 }}
@@ -200,7 +218,6 @@ export default function Home() {
               />
             </View>
 
-            {/* top bars */}
             <View style={styles.dots}>
               {media.map((_: any, i: number) => (
                 <View
@@ -220,7 +237,6 @@ export default function Home() {
           </View>
         </View>
 
-        {/* 🔥 buttons always visible */}
         <View style={styles.actions}>
           <TouchableOpacity style={styles.btn} onPress={handleDislike}>
             <Text style={{ fontSize: 30 }}>❌</Text>
@@ -235,12 +251,12 @@ export default function Home() {
   );
 }
 
+// ✅🔥 FIX: STYLES (missing tha)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
   },
-
   card: {
     height: 500,
     marginHorizontal: 20,
@@ -248,12 +264,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#111",
   },
-
   tapContainer: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: "row",
   },
-
   dots: {
     position: "absolute",
     top: 10,
@@ -261,7 +275,6 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingHorizontal: 5,
   },
-
   dot: {
     flex: 1,
     height: 3,
@@ -269,7 +282,6 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 2,
   },
-
   info: {
     position: "absolute",
     bottom: 0,
@@ -277,23 +289,19 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "rgba(0,0,0,0.5)",
   },
-
   name: {
     color: "white",
     fontSize: 24,
     fontWeight: "bold",
   },
-
   bio: {
     color: "white",
   },
-
   actions: {
     flexDirection: "row",
     justifyContent: "space-around",
     marginTop: 20,
   },
-
   btn: {
     width: 70,
     height: 70,
@@ -302,7 +310,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   center: {
     flex: 1,
     justifyContent: "center",
