@@ -1,3 +1,4 @@
+import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
@@ -45,12 +46,18 @@ export default function Profile() {
     router.replace("/welcome");
   };
 
+  // 🔥 NEW: CONTACT FUNCTION
+  const handleContact = () => {
+    Linking.openURL(
+      "mailto:indoridates@gmail.com?subject=IndoriDates Support&body=Hi, I am facing an issue...",
+    );
+  };
+
   return (
     <IndoreBackground>
       <FadeWrapper>
         <ScrollView contentContainerStyle={styles.container}>
           <View style={styles.card}>
-            {/* 🔥 Back button only in other profile */}
             {isOtherProfile && (
               <TouchableOpacity onPress={() => router.back()}>
                 <Text style={styles.backText}>← Back</Text>
@@ -100,7 +107,6 @@ export default function Profile() {
               </>
             )}
 
-            {/* 🔥 Only in My Profile */}
             {!isOtherProfile && (
               <>
                 <TouchableOpacity
@@ -116,6 +122,34 @@ export default function Profile() {
                 >
                   <Text style={styles.btnText}>Logout</Text>
                 </TouchableOpacity>
+
+                {/* 🔥 NEW: CONTACT SUPPORT */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#444",
+                    padding: 15,
+                    borderRadius: 12,
+                    marginTop: 10,
+                    alignItems: "center",
+                  }}
+                  onPress={handleContact}
+                >
+                  <Text style={{ color: "white", fontWeight: "bold" }}>
+                    📩 Contact Support
+                  </Text>
+                </TouchableOpacity>
+
+                <Text
+                  style={{
+                    color: "#ccc",
+                    fontSize: 12,
+                    textAlign: "center",
+                    marginTop: 8,
+                  }}
+                >
+                  For any issues or suggestions, contact us via email. We
+                  usually respond within 24–48 hours.
+                </Text>
               </>
             )}
           </View>
