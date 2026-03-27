@@ -1,17 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 
-import { ResizeMode, Video } from "expo-av";
-import { Image } from "expo-image";
-import { useLocalSearchParams, useRouter } from "expo-router";
-
+import { useRouter } from "expo-router";
 import {
   addDoc,
   arrayUnion,
@@ -27,38 +22,67 @@ import {
 
 import { useUserProfile } from "../../data/userProfile";
 import { auth, db } from "../../firebaseConfig";
+import { getDistance } from "../../utils/distance";
 
 import IndoreBackground from "../components/IndoreBackground";
+import MatchModal from "../components/MatchModal";
+import SwipeStack from "../components/SwipeStack";
+
+export interface SwipeUser {
+  id: string;
+  name: string;
+  age: number;
+  bio: string;
+  media: string[];
+  distance?: number;
+  latitude?: number;
+  longitude?: number;
+  gender?: string;
+}
+
+type SwipeAction = "like" | "dislike" | "superlike";
 
 export default function Home() {
   const router = useRouter();
-  const { viewUser } = useLocalSearchParams();
-  const { user: currentUser } = useUserProfile();
+  const { user: myProfile } = useUserProfile();
 
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<SwipeUser[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [mediaIndex, setMediaIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadUsers = async () => {
+  const [matchPair, setMatchPair] = useState<{
+    currentUser: SwipeUser;
+    matchedUser: SwipeUser;
+  } | null>(null);
+
+  const historyRef = useRef<SwipeUser[]>([]);
+
+  const loadUsers = useCallback(async () => {
+    try {
       const currentUid = auth.currentUser?.uid;
-      if (!currentUid || !currentUser) return;
+      if (!currentUid) {
+        setLoading(false);
+        return;
+      }
 
       const userSnap = await getDoc(doc(db, "users", currentUid));
       const userData = userSnap.data();
 
       const liked = userData?.liked || [];
       const disliked = userData?.disliked || [];
+      const superliked = userData?.superliked || [];
 
       const snap = await getDocs(collection(db, "users"));
-
-      const list: any[] = [];
+      const list: SwipeUser[] = [];
 
       snap.forEach((docSnap) => {
         if (docSnap.id === currentUid) return;
-
-        if (liked.includes(docSnap.id) || disliked.includes(docSnap.id)) return;
+        if (
+          liked.includes(docSnap.id) ||
+          disliked.includes(docSnap.id) ||
+          superliked.includes(docSnap.id)
+        )
+          return;
 
         const data = docSnap.data();
 
@@ -73,240 +97,168 @@ export default function Home() {
 
         if (media.length === 0) return;
 
+        let distance;
+
+        if (
+          myProfile?.latitude &&
+          myProfile?.longitude &&
+          data.latitude &&
+          data.longitude
+        ) {
+          distance = Math.round(
+            getDistance(
+              myProfile.latitude,
+              myProfile.longitude,
+              data.latitude,
+              data.longitude
+            )
+          );
+        }
+
         list.push({
           id: docSnap.id,
-          name: data.name || "Indori",
+          name: data.name || "User",
           age: data.age || 18,
           bio: data.bio || "",
           media,
+          distance,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          gender: data.gender,
         });
       });
 
       setUsers(list);
+    } catch (error) {
+      console.error("Error loading users:", error);
+    } finally {
       setLoading(false);
-    };
-
-    loadUsers();
-  }, [currentUser]);
-
-  const user = viewUser
-    ? users.find((u) => u.id === viewUser)
-    : users[currentIndex];
-
-  const nextUser = () => {
-    if (viewUser) return;
-    setCurrentIndex((prev) => prev + 1);
-    setMediaIndex(0);
-  };
-
-  const handleLike = async () => {
-    const target = user;
-    const myUid = auth.currentUser?.uid;
-    if (!target || !myUid) return;
-
-    await updateDoc(doc(db, "users", myUid), {
-      liked: arrayUnion(target.id),
-    });
-
-    await addDoc(collection(db, "likes"), {
-      from: myUid,
-      to: target.id,
-    });
-
-    const q = query(
-      collection(db, "likes"),
-      where("from", "==", target.id),
-      where("to", "==", myUid),
-    );
-
-    const snap = await getDocs(q);
-
-    if (!snap.empty) {
-      const roomId = [myUid, target.id].sort().join("_");
-
-      await setDoc(doc(db, "chatRooms", roomId), {
-        users: [myUid, target.id],
-        createdAt: Date.now(),
-      });
-
-      Alert.alert("🎉 It's a Match!", "Start chatting now!", [
-        {
-          text: "Open Chat",
-          onPress: () => router.push("/chat/" + roomId),
-        },
-      ]);
     }
+  }, [myProfile]);
 
-    nextUser();
-  };
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
-  const handleDislike = async () => {
-    const target = user;
-    const myUid = auth.currentUser?.uid;
-    if (!target || !myUid) return;
+  const handleSwipe = useCallback(
+    async (action: SwipeAction) => {
+      const target = users[currentIndex];
+      const myUid = auth.currentUser?.uid;
 
-    await updateDoc(doc(db, "users", myUid), {
-      disliked: arrayUnion(target.id),
-    });
+      if (!target || !myUid) return;
 
-    nextUser();
+      try {
+        historyRef.current.push(target);
+
+        if (action === "like" || action === "superlike") {
+          await updateDoc(doc(db, "users", myUid), {
+            [action === "superlike" ? "superliked" : "liked"]: arrayUnion(
+              target.id
+            ),
+          });
+
+          await addDoc(collection(db, "likes"), {
+            from: myUid,
+            to: target.id,
+            type: action,
+          });
+
+          const q = query(
+            collection(db, "likes"),
+            where("from", "==", target.id),
+            where("to", "==", myUid)
+          );
+
+          const snap = await getDocs(q);
+
+          if (!snap.empty) {
+            const roomId = [myUid, target.id].sort().join("_");
+
+            await setDoc(doc(db, "chatRooms", roomId), {
+              users: [myUid, target.id],
+              createdAt: Date.now(),
+            });
+
+            setMatchPair({
+              currentUser: target,
+              matchedUser: target,
+            });
+          }
+        }
+
+        if (action === "dislike") {
+          await updateDoc(doc(db, "users", myUid), {
+            disliked: arrayUnion(target.id),
+          });
+        }
+
+        setCurrentIndex((prev) => prev + 1);
+      } catch (error) {
+        console.error("Swipe error:", error);
+      }
+    },
+    [users, currentIndex]
+  );
+
+  const handleUndo = () => {
+    if (historyRef.current.length > 0) {
+      historyRef.current.pop();
+      setCurrentIndex((prev) => Math.max(0, prev - 1));
+    }
   };
 
   if (loading) {
     return (
       <IndoreBackground>
-        <ActivityIndicator style={{ flex: 1 }} color="#ff4d6d" />
-      </IndoreBackground>
-    );
-  }
-
-  if (!user) {
-    return (
-      <IndoreBackground>
         <View style={styles.center}>
-          <Text style={{ color: "white" }}>No more profiles 😅</Text>
+          <ActivityIndicator size="large" color="#ff4d6d" />
+          <Text style={styles.loadingText}>Loading profiles...</Text>
         </View>
       </IndoreBackground>
     );
   }
 
-  const media = user.media || [];
-  const currentMedia = media[mediaIndex];
+  const currentUser = users[currentIndex];
 
-  const isVideo =
-    typeof currentMedia === "string" && currentMedia.includes(".mp4");
+  if (!currentUser) {
+    return (
+      <IndoreBackground>
+        <View style={styles.center}>
+          <Text style={styles.emptyText}>No more profiles 😅</Text>
+          <Text style={styles.emptySubtext}>
+            Check back later for new matches!
+          </Text>
+        </View>
+      </IndoreBackground>
+    );
+  }
 
   return (
     <IndoreBackground>
       <View style={styles.container}>
-        <View key={user.id + "-" + mediaIndex} style={styles.card}>
-          <View style={{ flex: 1 }}>
-            {isVideo ? (
-              <Video
-                key={currentMedia}
-                source={{ uri: currentMedia }}
-                style={StyleSheet.absoluteFillObject}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay
-                isLooping
-              />
-            ) : (
-              <Image
-                key={currentMedia}
-                source={{ uri: currentMedia }}
-                style={StyleSheet.absoluteFillObject}
-                contentFit="cover"
-                contentPosition="center"
-                cachePolicy="memory-disk"
-                priority="high"
-              />
-            )}
+        <SwipeStack
+          users={users.slice(currentIndex, currentIndex + 3)}
+          onSwipe={handleSwipe}
+          onCardPress={() => router.push(`/user/${currentUser.id}`)}
+          onUndo={handleUndo}
+        />
 
-            <View style={styles.tapContainer}>
-              <TouchableOpacity
-                style={{ flex: 1 }}
-                onPress={() => {
-                  if (mediaIndex > 0) setMediaIndex(mediaIndex - 1);
-                }}
-              />
-              <TouchableOpacity
-                style={{ flex: 1 }}
-                onPress={() => {
-                  if (mediaIndex < media.length - 1)
-                    setMediaIndex(mediaIndex + 1);
-                }}
-              />
-            </View>
-
-            <View style={styles.dots}>
-              {media.map((_: any, i: number) => (
-                <View
-                  key={i}
-                  style={[styles.dot, { opacity: i === mediaIndex ? 1 : 0.3 }]}
-                />
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.info}>
-            <Text style={styles.name}>
-              {user.name}, {user.age}
-            </Text>
-            <Text style={styles.bio}>{user.bio}</Text>
-            <Text style={{ color: "white" }}>📍 Nearby</Text>
-          </View>
-        </View>
-
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.btn} onPress={handleDislike}>
-            <Text style={{ fontSize: 30 }}>❌</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.btn} onPress={handleLike}>
-            <Text style={{ fontSize: 30 }}>❤️</Text>
-          </TouchableOpacity>
-        </View>
+        {matchPair && (
+          <MatchModal
+            currentUser={matchPair.currentUser}
+            matchedUser={matchPair.matchedUser}
+            onChat={() => {}}
+            onContinue={() => setMatchPair(null)}
+          />
+        )}
       </View>
     </IndoreBackground>
   );
 }
 
-// ✅🔥 FIX: STYLES (missing tha)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-  },
-  card: {
-    height: 500,
-    marginHorizontal: 20,
-    borderRadius: 20,
-    overflow: "hidden",
-    backgroundColor: "#111",
-  },
-  tapContainer: {
-    ...StyleSheet.absoluteFillObject,
-    flexDirection: "row",
-  },
-  dots: {
-    position: "absolute",
-    top: 10,
-    flexDirection: "row",
-    width: "100%",
-    paddingHorizontal: 5,
-  },
-  dot: {
-    flex: 1,
-    height: 3,
-    marginHorizontal: 2,
-    backgroundColor: "white",
-    borderRadius: 2,
-  },
-  info: {
-    position: "absolute",
-    bottom: 0,
-    padding: 20,
-    width: "100%",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  name: {
-    color: "white",
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  bio: {
-    color: "white",
-  },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 20,
-  },
-  btn: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: "#333",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -314,5 +266,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingText: {
+    color: "#fff",
+    marginTop: 10,
+  },
+  emptyText: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  emptySubtext: {
+    color: "#aaa",
+    fontSize: 14,
   },
 });

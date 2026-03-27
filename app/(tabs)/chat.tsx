@@ -19,9 +19,11 @@ import {
   where,
 } from "firebase/firestore";
 
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+
 import { auth, db } from "../../firebaseConfig";
 
-// 🔥 ADD THESE
 import FadeWrapper from "../components/FadeWrapper";
 import IndoreBackground from "../components/IndoreBackground";
 
@@ -81,6 +83,8 @@ export default function ChatTab() {
             id: d.id,
             name: u.name,
             photo: u.photos?.[0] || "",
+            message: "Start chatting",
+            time: "",
           });
         }
       }
@@ -98,17 +102,35 @@ export default function ChatTab() {
     <IndoreBackground>
       <FadeWrapper>
         <ScrollView style={styles.container}>
-          {/* 💖 Likes */}
-          <Text style={styles.title}>💖 Likes You</Text>
+
+          {/* Likes Section */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.title}>💖 Likes You</Text>
+
+            {likes.length > 0 && (
+              <TouchableOpacity>
+                <Text style={styles.seeAll}>See all</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {likes.map((u, index) => (
-            <View key={u.id + "_" + index} style={styles.card}>
+            <LinearGradient
+              key={u.id + "_" + index}
+              colors={["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]}
+              style={styles.card}
+            >
               <Image source={{ uri: u.photo }} style={styles.photo} />
 
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{u.name}</Text>
 
+                <Text style={styles.sub}>
+                  Adventure seeker ✈️ Traveler
+                </Text>
+
                 <TouchableOpacity
+                  style={styles.profileBtn}
                   onPress={() =>
                     router.push({
                       pathname: "/(tabs)/home",
@@ -116,26 +138,43 @@ export default function ChatTab() {
                     })
                   }
                 >
-                  <Text style={styles.view}>View Profile</Text>
+                  <Text style={styles.profileText}>View Profile</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+
+              <Feather name="heart" size={20} color="#ff2d95" />
+            </LinearGradient>
           ))}
 
-          {/* 💬 Matches */}
-          <Text style={[styles.title, { marginTop: 30 }]}>💬 Matches</Text>
+          {/* Matches Section */}
+          <Text style={[styles.title, { marginTop: 25 }]}>💬 Matches</Text>
 
           {chats.map((c) => (
-            <TouchableOpacity
+            <LinearGradient
               key={c.id}
+              colors={["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]}
               style={styles.card}
-              onPress={() => router.push("/chat/" + c.id)}
             >
-              <Image source={{ uri: c.photo }} style={styles.photo} />
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => router.push("/chat/" + c.id)}
+              >
+                <Image source={{ uri: c.photo }} style={styles.photo} />
 
-              <Text style={styles.name}>{c.name}</Text>
-            </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>{c.name}</Text>
+
+                  <Text style={styles.message}>{c.message}</Text>
+                </View>
+
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={styles.time}>{c.time}</Text>
+                  <Feather name="heart" size={18} color="#ff2d95" />
+                </View>
+              </TouchableOpacity>
+            </LinearGradient>
           ))}
+
         </ScrollView>
       </FadeWrapper>
     </IndoreBackground>
@@ -143,42 +182,85 @@ export default function ChatTab() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
+
+  container:{
+    flex:1,
+    padding:16
   },
 
-  title: {
-    fontSize: 22,
-    color: "white",
-    fontWeight: "bold",
-    marginBottom: 10,
+  sectionHeader:{
+    flexDirection:"row",
+    justifyContent:"space-between",
+    alignItems:"center"
   },
 
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.6)",
-    padding: 12,
-    borderRadius: 15,
-    marginBottom: 10,
+  title:{
+    fontSize:22,
+    color:"white",
+    fontWeight:"bold",
+    marginBottom:10
   },
 
-  photo: {
-    width: 55,
-    height: 55,
-    borderRadius: 28,
-    marginRight: 12,
+  seeAll:{
+    color:"#ddd"
   },
 
-  name: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "600",
+  card:{
+    flexDirection:"row",
+    alignItems:"center",
+    padding:15,
+    borderRadius:20,
+    marginBottom:12
   },
 
-  view: {
-    color: "#4da6ff",
-    marginTop: 4,
+  row:{
+    flexDirection:"row",
+    alignItems:"center",
+    flex:1
   },
+
+  photo:{
+    width:60,
+    height:60,
+    borderRadius:30,
+    marginRight:12
+  },
+
+  name:{
+    color:"white",
+    fontSize:18,
+    fontWeight:"600"
+  },
+
+  sub:{
+    color:"#ddd",
+    fontSize:13,
+    marginTop:2
+  },
+
+  message:{
+    color:"#ccc",
+    marginTop:3
+  },
+
+  time:{
+    color:"#bbb",
+    fontSize:12,
+    marginBottom:5
+  },
+
+  profileBtn:{
+    marginTop:6,
+    backgroundColor:"#3b82f6",
+    paddingVertical:5,
+    paddingHorizontal:10,
+    borderRadius:10,
+    alignSelf:"flex-start"
+  },
+
+  profileText:{
+    color:"white",
+    fontSize:12
+  }
+
 });

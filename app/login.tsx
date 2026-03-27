@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../firebaseConfig";
 
 export default function Login() {
@@ -38,16 +39,10 @@ export default function Login() {
       setLoading(true);
 
       if (isRegister) {
-        await createUserWithEmailAndPassword(
-          auth,
-          email.trim(),
-          password.trim(),
-        );
-
+        await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
         router.replace("/profile-completion");
       } else {
         await signInWithEmailAndPassword(auth, email.trim(), password.trim());
-
         router.replace("/");
       }
     } catch (error: any) {
@@ -58,73 +53,87 @@ export default function Login() {
   };
 
   return (
-    <ImageBackground
-      source={require("../assets/indore-bg.png")}
-      style={styles.background}
-      resizeMode="cover"
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.overlay}
+    <SafeAreaView style={{ flex: 1 }}>
+      <ImageBackground
+        source={require("../assets/indore-bg.png")}
+        style={styles.background}
+        imageStyle={styles.image}
+        resizeMode="cover"
       >
-        <View style={styles.card}>
-          <Text style={styles.title}>
-            {isRegister ? "Create Account" : "Welcome Back"}
-          </Text>
-
-          <TextInput
-            placeholder="Email"
-            placeholderTextColor="#ccc"
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-          />
-
-          <TextInput
-            placeholder="Password"
-            placeholderTextColor="#ccc"
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleAuth}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>
-                {isRegister ? "Register" : "Login"}
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setIsRegister(!isRegister)}>
-            <Text style={styles.switchText}>
-              {isRegister
-                ? "Already have an account? Login"
-                : "New user? Create account"}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.overlay}
+        >
+          <View style={styles.card}>
+            <Text style={styles.title}>
+              {isRegister ? "Create Account" : "Welcome Back"}
             </Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    </ImageBackground>
+
+            <TextInput
+              placeholder="Email"
+              placeholderTextColor="#ccc"
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+            />
+
+            <TextInput
+              placeholder="Password"
+              placeholderTextColor="#ccc"
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleAuth}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>
+                  {isRegister ? "Register" : "Login"}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setIsRegister(!isRegister)}>
+              <Text style={styles.switchText}>
+                {isRegister
+                  ? "Already have an account? Login"
+                  : "New user? Create account"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </ImageBackground>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  background: { flex: 1 },
+  background: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+  },
+
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+
   overlay: {
     flex: 1,
     justifyContent: "center",
-    padding: 20,
+    paddingHorizontal: 20,
     backgroundColor: "rgba(0,0,0,0.35)",
   },
+
   card: {
     backgroundColor: "rgba(255,255,255,0.15)",
     padding: 30,
@@ -132,6 +141,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)",
   },
+
   title: {
     fontSize: 26,
     fontWeight: "bold",
@@ -139,6 +149,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "white",
   },
+
   input: {
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.4)",
@@ -148,6 +159,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     color: "white",
   },
+
   button: {
     backgroundColor: "#ff4d6d",
     padding: 15,
@@ -155,11 +167,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 15,
   },
+
   buttonText: {
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
   },
+
   switchText: {
     textAlign: "center",
     color: "#fff",
