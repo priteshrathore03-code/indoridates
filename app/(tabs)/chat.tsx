@@ -53,6 +53,8 @@ export default function ChatTab() {
           arr.push({
             id: data.from,
             name: u.name,
+            age: u.age,
+            bio: u.bio,
             photo: u.photos?.[0] || "",
           });
         }
@@ -79,12 +81,17 @@ export default function ChatTab() {
         if (userDoc.exists()) {
           const u = userDoc.data();
 
+          // Get last message from the room
+          const lastMsg = data.lastMessage;
+
           arr.push({
             id: d.id,
             name: u.name,
             photo: u.photos?.[0] || "",
-            message: "Start chatting",
-            time: "",
+            message: lastMsg?.text || "Start chatting",
+            time: lastMsg?.createdAt 
+              ? new Date(lastMsg.createdAt.toDate()).toLocaleString()
+              : "",
           });
         }
       }
@@ -120,23 +127,20 @@ export default function ChatTab() {
               colors={["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]}
               style={styles.card}
             >
-              <Image source={{ uri: u.photo }} style={styles.photo} />
+              <TouchableOpacity onPress={() => router.push(`/user/${u.id}`)}>
+                <Image source={{ uri: u.photo }} style={styles.photo} />
+              </TouchableOpacity>
 
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{u.name}</Text>
 
                 <Text style={styles.sub}>
-                  Adventure seeker ✈️ Traveler
+                  {u.bio || "No bio yet"}
                 </Text>
 
                 <TouchableOpacity
                   style={styles.profileBtn}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/(tabs)/home",
-                      params: { viewUser: u.id },
-                    })
-                  }
+                  onPress={() => router.push(`/user/${u.id}`)}
                 >
                   <Text style={styles.profileText}>View Profile</Text>
                 </TouchableOpacity>

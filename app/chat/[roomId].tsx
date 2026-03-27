@@ -1,31 +1,31 @@
 import { useEffect, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  where,
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    onSnapshot,
+    orderBy,
+    query,
+    serverTimestamp,
+    where,
 } from "firebase/firestore";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -207,13 +207,16 @@ export default function ChatRoom() {
               </TouchableOpacity>
 
               {otherUser && (
-                <>
+                <TouchableOpacity
+                  style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+                  onPress={() => router.push(`/user/${otherUser.uid}`)}
+                >
                   <Image
                     source={{ uri: otherUser.photos?.[0] }}
                     style={styles.avatar}
                   />
                   <Text style={styles.headerName}>{otherUser.name}</Text>
-                </>
+                </TouchableOpacity>
               )}
 
               <TouchableOpacity

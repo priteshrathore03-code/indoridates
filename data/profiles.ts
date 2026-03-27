@@ -1,3 +1,21 @@
+/**
+ * DEPRECATED: This file contains mock profile data and should NOT be used.
+ * 
+ * All user data must come from Firestore in the "users" collection.
+ * 
+ * This file is kept for reference only. Remove if no longer needed.
+ * 
+ * Real user fields from Firestore:
+ * - name
+ * - age
+ * - gender
+ * - bio
+ * - photos (array)
+ * - video (optional)
+ * - latitude, longitude
+ * - and other fields
+ */
+
 export type ProfileType = {
   id: string;
   name: string;
@@ -7,6 +25,10 @@ export type ProfileType = {
   image: string;
 };
 
+/**
+ * @deprecated - Use Firestore data instead
+ * This is mock data kept for reference only
+ */
 export const profiles: ProfileType[] = [
   {
     id: "1",

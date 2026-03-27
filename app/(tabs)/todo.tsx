@@ -3,14 +3,14 @@ import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 
 import {
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import { Feather } from "@expo/vector-icons";
@@ -19,11 +19,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { createChatRoom } from "../../data/chatStore";
 import {
-  addPlan,
-  deletePlan,
-  listenPlans,
-  PlanType,
-  updatePlan,
+    addPlan,
+    deletePlan,
+    listenPlans,
+    PlanType,
+    updatePlan,
 } from "../../data/planStore";
 
 import { useUserProfile } from "../../data/userProfile";
@@ -123,13 +123,16 @@ export default function Todo() {
               return (
                 <View key={plan.id} style={styles.card}>
                   {creator && (
-                    <View style={styles.profileRow}>
+                    <TouchableOpacity
+                      style={styles.profileRow}
+                      onPress={() => router.push(`/user/${plan.createdBy}`)}
+                    >
                       <Image
                         source={{ uri: creator.photos?.[0] }}
                         style={styles.profileImage}
                       />
                       <Text style={styles.name}>{creator.name}</Text>
-                    </View>
+                    </TouchableOpacity>
                   )}
 
                   <Text style={styles.title}>{plan.title}</Text>
