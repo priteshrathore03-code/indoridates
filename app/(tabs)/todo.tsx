@@ -1,29 +1,27 @@
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
-
 import {
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-
-import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { createChatRoom } from "../../data/chatStore";
 import {
-    addPlan,
-    deletePlan,
-    listenPlans,
-    PlanType,
-    updatePlan,
+  addPlan,
+  deletePlan,
+  listenPlans,
+  PlanType,
+  updatePlan,
 } from "../../data/planStore";
 
 import { useUserProfile } from "../../data/userProfile";
@@ -44,33 +42,49 @@ export default function Todo() {
   const [time, setTime] = useState("");
   const [brief, setBrief] = useState("");
 
+  // चेक करने के लिए कि क्या लड़की का कोई प्लान पहले से एक्टिव है
+  const hasActivePlan = plans.some((p) => p.createdBy === user?.uid);
+
   useEffect(() => {
     const unsubscribe = listenPlans(async (data) => {
       setPlans(data);
       await fetchUsers(data);
     });
-
     return () => unsubscribe();
   }, []);
 
   const fetchUsers = async (plansData: PlanType[]) => {
-    const map: any = {};
+    const map: any = { ...usersMap };
+    let changed = false;
 
     for (const plan of plansData) {
+      // प्लान बनाने वाले का डेटा
       if (!map[plan.createdBy]) {
         const snap = await getDoc(doc(db, "users", plan.createdBy));
-        if (snap.exists()) map[plan.createdBy] = snap.data();
+        if (snap.exists()) {
+          map[plan.createdBy] = snap.data();
+          changed = true;
+        }
+      }
+      // रिक्वेस्ट भेजने वालों का डेटा
+      for (const reqUid of plan.requests) {
+        if (!map[reqUid]) {
+          const snap = await getDoc(doc(db, "users", reqUid));
+          if (snap.exists()) {
+            map[reqUid] = snap.data();
+            changed = true;
+          }
+        }
       }
     }
-
-    setUsersMap(map);
+    if (changed) setUsersMap(map);
   };
 
   if (!user) return null;
 
   const handleCreate = async () => {
     if (!title || !time || !brief) {
-      Alert.alert("Fill all fields");
+      Alert.alert("Error", "Please fill all fields");
       return;
     }
 
@@ -91,20 +105,35 @@ export default function Todo() {
     setShowForm(false);
   };
 
+  const handleDelete = async (planId: string) => {
+    Alert.alert("Delete Plan", "Are you sure you want to cancel this plan?", [
+      { text: "No" },
+      { text: "Yes", onPress: () => deletePlan(planId) },
+    ]);
+  };
+
   const handleInterested = async (plan: PlanType) => {
     if (!plan.id) return;
+    if (plan.requests.includes(user.uid)) {
+      Alert.alert("Already Sent", "You have already requested to join.");
+      return;
+    }
 
     await updatePlan(plan.id, {
       requests: [...plan.requests, user.uid],
     });
+    Alert.alert("Success", "Interest sent to the host!");
   };
 
   const handleAccept = async (plan: PlanType, reqUid: string) => {
     if (!plan.id) return;
 
+    // 1. चैट रूम बनाओ
     await createChatRoom(plan.createdBy, reqUid);
+    // 2. प्लान डिलीट करो (ताकि लड़की नया प्लान बना सके और लिस्ट साफ हो जाए)
     await deletePlan(plan.id);
 
+    Alert.alert("Accepted!", "Chat room created. Heading to messages...");
     router.replace("/(tabs)/chat");
   };
 
@@ -112,52 +141,105 @@ export default function Todo() {
     <IndoreBackground>
       <FadeWrapper>
         <SafeAreaView style={{ flex: 1 }}>
-
           <ScrollView
             style={styles.container}
             contentContainerStyle={{ paddingBottom: 120 }}
           >
             {plans.map((plan) => {
               const creator = usersMap[plan.createdBy];
+              const isMyPlan = plan.createdBy === user.uid;
 
               return (
                 <View key={plan.id} style={styles.card}>
-                  {creator && (
+                  {/* HEADER: Profile & Actions */}
+                  <View style={styles.cardHeader}>
                     <TouchableOpacity
                       style={styles.profileRow}
                       onPress={() => router.push(`/user/${plan.createdBy}`)}
                     >
                       <Image
-                        source={{ uri: creator.photos?.[0] }}
+                        source={{
+                          uri:
+                            creator?.photos?.[0] ||
+                            "https://via.placeholder.com/150",
+                        }}
                         style={styles.profileImage}
                       />
-                      <Text style={styles.name}>{creator.name}</Text>
+                      <View>
+                        <Text style={styles.name}>
+                          {creator?.name || "Loading..."}
+                        </Text>
+                        <Text style={styles.timeText}>{plan.time}</Text>
+                      </View>
                     </TouchableOpacity>
-                  )}
+
+                    {/* DELETE OPTION (ONLY FOR CREATOR) */}
+                    {isMyPlan && (
+                      <TouchableOpacity onPress={() => handleDelete(plan.id!)}>
+                        <Feather name="trash-2" size={20} color="#ff416c" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
 
                   <Text style={styles.title}>{plan.title}</Text>
-                  <Text style={styles.time}>{plan.time}</Text>
                   <Text style={styles.brief}>{plan.brief}</Text>
 
-                  {plan.createdBy !== user.uid && (
+                  {/* BOYS VIEW: Interest Button */}
+                  {!isMyPlan && (
                     <TouchableOpacity
-                      style={styles.interestBtn}
+                      style={[
+                        styles.interestBtn,
+                        plan.requests.includes(user.uid) && { opacity: 0.6 },
+                      ]}
                       onPress={() => handleInterested(plan)}
+                      disabled={plan.requests.includes(user.uid)}
                     >
-                      <Text style={styles.btnText}>Interested</Text>
+                      <Text style={styles.btnText}>
+                        {plan.requests.includes(user.uid)
+                          ? "Request Sent"
+                          : "Interested"}
+                      </Text>
                     </TouchableOpacity>
                   )}
 
-                  {plan.createdBy === user.uid &&
-                    plan.requests.map((reqUid) => (
-                      <TouchableOpacity
-                        key={reqUid}
-                        style={styles.acceptBtn}
-                        onPress={() => handleAccept(plan, reqUid)}
-                      >
-                        <Text style={styles.btnText}>Accept Request</Text>
-                      </TouchableOpacity>
-                    ))}
+                  {/* GIRLS VIEW: Request List with Profile Photos */}
+                  {isMyPlan && plan.requests.length > 0 && (
+                    <View style={styles.requestSection}>
+                      <Text style={styles.requestCount}>
+                        Requests ({plan.requests.length})
+                      </Text>
+                      {plan.requests.map((reqUid) => {
+                        const reqUser = usersMap[reqUid];
+                        return (
+                          <View key={reqUid} style={styles.reqUserRow}>
+                            <TouchableOpacity
+                              style={styles.reqInfo}
+                              onPress={() => router.push(`/user/${reqUid}`)}
+                            >
+                              <Image
+                                source={{
+                                  uri:
+                                    reqUser?.photos?.[0] ||
+                                    "https://via.placeholder.com/150",
+                                }}
+                                style={styles.reqAvatar}
+                              />
+                              <Text style={styles.reqName}>
+                                {reqUser?.name || "User"}
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={styles.smallAcceptBtn}
+                              onPress={() => handleAccept(plan, reqUid)}
+                            >
+                              <Text style={styles.smallBtnText}>Accept</Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -167,78 +249,66 @@ export default function Todo() {
           {showForm && (
             <View style={styles.overlay}>
               <View style={styles.formCard}>
-
-                <Text style={styles.formTitle}>Create a Plan</Text>
-
+                <Text style={styles.formTitle}>Post a Plan</Text>
                 <View style={styles.inputBox}>
                   <Feather name="edit-2" size={18} color="#fff" />
                   <TextInput
-                    placeholder="Plan Title"
+                    placeholder="Where to? (e.g. Starbucks)"
                     placeholderTextColor="#ddd"
                     style={styles.input}
                     value={title}
                     onChangeText={setTitle}
                   />
                 </View>
-
                 <View style={styles.inputBox}>
                   <Feather name="clock" size={18} color="#fff" />
                   <TextInput
-                    placeholder="Time"
+                    placeholder="What time? (e.g. 7:00 PM)"
                     placeholderTextColor="#ddd"
                     style={styles.input}
                     value={time}
                     onChangeText={setTime}
                   />
                 </View>
-
                 <View style={styles.inputBox}>
                   <Feather name="file-text" size={18} color="#fff" />
                   <TextInput
-                    placeholder="Brief Description"
+                    placeholder="Short description..."
                     placeholderTextColor="#ddd"
                     style={styles.input}
                     value={brief}
                     onChangeText={setBrief}
                   />
                 </View>
-
                 <TouchableOpacity onPress={handleCreate}>
                   <LinearGradient
                     colors={["#ffb347", "#ff416c", "#ff2d95"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
                     style={styles.saveBtn}
                   >
-                    <Text style={styles.saveText}>Save Plan</Text>
+                    <Text style={styles.saveText}>Post Now</Text>
                   </LinearGradient>
                 </TouchableOpacity>
-
                 <TouchableOpacity onPress={() => setShowForm(false)}>
                   <Text style={styles.cancel}>Cancel</Text>
                 </TouchableOpacity>
-
               </View>
             </View>
           )}
 
-          {/* CREATE PLAN BUTTON */}
-          {!showForm && (
+          {/* CREATE BUTTON (ONLY FOR FEMALE AND IF NO ACTIVE PLAN) */}
+          {!showForm && user.gender === "female" && !hasActivePlan && (
             <TouchableOpacity
               onPress={() => setShowForm(true)}
               style={styles.createBtnContainer}
             >
               <LinearGradient
                 colors={["#ffb347", "#ff416c", "#ff2d95"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
                 style={styles.createBtn}
               >
-                <Text style={styles.createText}>Create Plan</Text>
+                <Text style={styles.createText}>+ Create New Plan</Text>
               </LinearGradient>
             </TouchableOpacity>
           )}
-
         </SafeAreaView>
       </FadeWrapper>
     </IndoreBackground>
@@ -246,152 +316,131 @@ export default function Todo() {
 }
 
 const styles = StyleSheet.create({
-
-  container:{
-    flex:1,
-    padding:16
+  container: { flex: 1, padding: 16 },
+  card: {
+    backgroundColor: "rgba(0,0,0,0.85)",
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "rgba(255,215,0,0.2)",
   },
-
-  card:{
-    backgroundColor:"rgba(0,0,0,0.75)",
-    padding:16,
-    borderRadius:16,
-    marginBottom:15
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
   },
-
-  profileRow:{
-    flexDirection:"row",
-    alignItems:"center",
-    marginBottom:10
+  profileRow: { flexDirection: "row", alignItems: "center" },
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: "#FFD700",
   },
-
-  profileImage:{
-    width:45,
-    height:45,
-    borderRadius:22,
-    marginRight:10
+  name: { color: "#FFD700", fontWeight: "bold", fontSize: 16 },
+  timeText: { color: "#aaa", fontSize: 12 },
+  title: { color: "white", fontSize: 19, fontWeight: "bold", marginBottom: 5 },
+  brief: { color: "#ccc", fontSize: 14, lineHeight: 20 },
+  interestBtn: {
+    backgroundColor: "#ff2d95",
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 15,
+    alignItems: "center",
   },
+  btnText: { color: "white", fontWeight: "bold" },
 
-  name:{
-    color:"#FFD700",
-    fontWeight:"bold"
+  // Request Styles
+  requestSection: {
+    marginTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#333",
+    paddingTop: 15,
   },
-
-  title:{
-    color:"white",
-    fontSize:17,
-    fontWeight:"600"
+  requestCount: {
+    color: "#FFD700",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginBottom: 10,
   },
-
-  time:{
-    color:"#ffa726",
-    marginTop:2
+  reqUserRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 8,
   },
-
-  brief:{
-    color:"#eee",
-    marginTop:4
+  reqInfo: { flexDirection: "row", alignItems: "center", flex: 1 },
+  reqAvatar: { width: 35, height: 35, borderRadius: 17.5, marginRight: 10 },
+  reqName: { color: "white", fontWeight: "600" },
+  smallAcceptBtn: {
+    backgroundColor: "#3b82f6",
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
+  smallBtnText: { color: "white", fontWeight: "bold", fontSize: 12 },
 
-  interestBtn:{
-    backgroundColor:"#ff2d95",
-    padding:10,
-    borderRadius:10,
-    marginTop:12,
-    alignItems:"center"
+  overlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    padding: 20,
   },
-
-  acceptBtn:{
-    backgroundColor:"#3b82f6",
-    padding:10,
-    borderRadius:10,
-    marginTop:10,
-    alignItems:"center"
+  formCard: {
+    width: "100%",
+    backgroundColor: "#1a1a1a",
+    borderRadius: 25,
+    padding: 25,
+    borderWidth: 1,
+    borderColor: "#333",
   },
-
-  btnText:{
-    color:"white",
-    fontWeight:"bold"
+  formTitle: {
+    fontSize: 26,
+    color: "white",
+    textAlign: "center",
+    marginBottom: 25,
+    fontWeight: "bold",
   },
-
-  overlay:{
-    position:"absolute",
-    bottom:120,
-    left:20,
-    right:20,
-    alignItems:"center"
+  inputBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderRadius: 15,
+    marginBottom: 15,
   },
-
-  formCard:{
-    width:"100%",
-    backgroundColor:"rgba(255,255,255,0.08)",
-    borderRadius:25,
-    padding:25
+  input: { flex: 1, color: "white", fontSize: 16, marginLeft: 10 },
+  saveBtn: {
+    paddingVertical: 16,
+    borderRadius: 15,
+    alignItems: "center",
+    marginTop: 10,
   },
-
-  formTitle:{
-    fontSize:32,
-    color:"white",
-    textAlign:"center",
-    marginBottom:25,
-    fontFamily:"serif"
+  saveText: { color: "white", fontWeight: "bold", fontSize: 18 },
+  cancel: { textAlign: "center", color: "#888", marginTop: 15, fontSize: 16 },
+  createBtnContainer: {
+    position: "absolute",
+    bottom: 30,
+    alignSelf: "center",
+    width: "80%",
   },
-
-  inputBox:{
-    flexDirection:"row",
-    alignItems:"center",
-    backgroundColor:"rgba(255,255,255,0.12)",
-    paddingHorizontal:15,
-    paddingVertical:14,
-    borderRadius:15,
-    marginBottom:15,
-    gap:10
+  createBtn: {
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 5,
   },
-
-  input:{
-    flex:1,
-    color:"white",
-    fontSize:16
-  },
-
-  saveBtn:{
-    paddingVertical:16,
-    borderRadius:30,
-    alignItems:"center",
-    marginTop:10
-  },
-
-  saveText:{
-    color:"white",
-    fontWeight:"bold",
-    fontSize:18
-  },
-
-  cancel:{
-    textAlign:"center",
-    color:"#ddd",
-    marginTop:15,
-    fontSize:16
-  },
-
-  createBtnContainer:{
-    position:"absolute",
-    bottom:20,
-    left:40,
-    right:40
-  },
-
-  createBtn:{
-    height:55,
-    borderRadius:28,
-    justifyContent:"center",
-    alignItems:"center"
-  },
-
-  createText:{
-    color:"white",
-    fontWeight:"bold",
-    fontSize:18
-  }
-
+  createText: { color: "white", fontWeight: "bold", fontSize: 18 },
 });

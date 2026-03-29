@@ -1,31 +1,32 @@
+import { updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    getDocs,
-    onSnapshot,
-    orderBy,
-    query,
-    serverTimestamp,
-    where,
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  where,
 } from "firebase/firestore";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -100,15 +101,27 @@ export default function ChatRoom() {
 
     const q = query(
       collection(db, "messages"),
+
       where("roomId", "==", String(roomId)),
       orderBy("createdAt", "asc"),
     );
 
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(q, async (snap) => {
       const arr: any[] = [];
-      snap.forEach((d) => {
-        arr.push({ id: d.id, ...d.data() });
-      });
+
+      for (const d of snap.docs) {
+        const data = d.data();
+
+        // 🔥 READ LOGIC (AUTO)
+        if (data.senderId !== myUid && data.status !== "read") {
+          await updateDoc(doc(db, "messages", d.id), {
+            status: "read",
+          });
+        }
+
+        arr.push({ id: d.id, ...data });
+      }
+
       setMessages(arr);
     });
 
@@ -123,6 +136,7 @@ export default function ChatRoom() {
       senderId: myUid,
       text,
       createdAt: serverTimestamp(),
+      status: "sent", // 🔥 ADD THIS
     });
 
     setText("");
@@ -208,7 +222,11 @@ export default function ChatRoom() {
 
               {otherUser && (
                 <TouchableOpacity
-                  style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
                   onPress={() => router.push(`/user/${otherUser.uid}`)}
                 >
                   <Image
@@ -246,7 +264,23 @@ export default function ChatRoom() {
                   <View
                     style={[styles.msg, isMe ? styles.myMsg : styles.otherMsg]}
                   >
-                    <Text style={{ color: "white" }}>{item.text}</Text>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <Text style={{ color: "white" }}>{item.text}</Text>
+
+                      {isMe && (
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            marginLeft: 6,
+                            color: item.status === "read" ? "#4fc3f7" : "#ccc",
+                          }}
+                        >
+                          {item.status === "read" ? "✓✓" : "✓"}
+                        </Text>
+                      )}
+                    </View>
                   </View>
                 );
               }}

@@ -89,7 +89,7 @@ export default function ChatTab() {
             name: u.name,
             photo: u.photos?.[0] || "",
             message: lastMsg?.text || "Start chatting",
-            time: lastMsg?.createdAt 
+            time: lastMsg?.createdAt
               ? new Date(lastMsg.createdAt.toDate()).toLocaleString()
               : "",
           });
@@ -109,7 +109,6 @@ export default function ChatTab() {
     <IndoreBackground>
       <FadeWrapper>
         <ScrollView style={styles.container}>
-
           {/* Likes Section */}
           <View style={styles.sectionHeader}>
             <Text style={styles.title}>💖 Likes You</Text>
@@ -127,20 +126,20 @@ export default function ChatTab() {
               colors={["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]}
               style={styles.card}
             >
-              <TouchableOpacity onPress={() => router.push(`/user/${u.id}`)}>
+              <TouchableOpacity
+                onPress={() => router.push(`/home?focusUser=${u.id}`)}
+              >
                 <Image source={{ uri: u.photo }} style={styles.photo} />
               </TouchableOpacity>
 
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{u.name}</Text>
 
-                <Text style={styles.sub}>
-                  {u.bio || "No bio yet"}
-                </Text>
+                <Text style={styles.sub}>{u.bio || "No bio yet"}</Text>
 
                 <TouchableOpacity
                   style={styles.profileBtn}
-                  onPress={() => router.push(`/user/${u.id}`)}
+                  onPress={() => router.push(`/home?focusUser=${u.id}`)}
                 >
                   <Text style={styles.profileText}>View Profile</Text>
                 </TouchableOpacity>
@@ -178,7 +177,6 @@ export default function ChatTab() {
               </TouchableOpacity>
             </LinearGradient>
           ))}
-
         </ScrollView>
       </FadeWrapper>
     </IndoreBackground>
@@ -186,85 +184,83 @@ export default function ChatTab() {
 }
 
 const styles = StyleSheet.create({
-
-  container:{
-    flex:1,
-    padding:16
+  container: {
+    flex: 1,
+    padding: 16,
   },
 
-  sectionHeader:{
-    flexDirection:"row",
-    justifyContent:"space-between",
-    alignItems:"center"
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
-  title:{
-    fontSize:22,
-    color:"white",
-    fontWeight:"bold",
-    marginBottom:10
+  title: {
+    fontSize: 22,
+    color: "white",
+    fontWeight: "bold",
+    marginBottom: 10,
   },
 
-  seeAll:{
-    color:"#ddd"
+  seeAll: {
+    color: "#ddd",
   },
 
-  card:{
-    flexDirection:"row",
-    alignItems:"center",
-    padding:15,
-    borderRadius:20,
-    marginBottom:12
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 15,
+    borderRadius: 20,
+    marginBottom: 12,
   },
 
-  row:{
-    flexDirection:"row",
-    alignItems:"center",
-    flex:1
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
   },
 
-  photo:{
-    width:60,
-    height:60,
-    borderRadius:30,
-    marginRight:12
+  photo: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 12,
   },
 
-  name:{
-    color:"white",
-    fontSize:18,
-    fontWeight:"600"
+  name: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
   },
 
-  sub:{
-    color:"#ddd",
-    fontSize:13,
-    marginTop:2
+  sub: {
+    color: "#ddd",
+    fontSize: 13,
+    marginTop: 2,
   },
 
-  message:{
-    color:"#ccc",
-    marginTop:3
+  message: {
+    color: "#ccc",
+    marginTop: 3,
   },
 
-  time:{
-    color:"#bbb",
-    fontSize:12,
-    marginBottom:5
+  time: {
+    color: "#bbb",
+    fontSize: 12,
+    marginBottom: 5,
   },
 
-  profileBtn:{
-    marginTop:6,
-    backgroundColor:"#3b82f6",
-    paddingVertical:5,
-    paddingHorizontal:10,
-    borderRadius:10,
-    alignSelf:"flex-start"
+  profileBtn: {
+    marginTop: 6,
+    backgroundColor: "#3b82f6",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    alignSelf: "flex-start",
   },
 
-  profileText:{
-    color:"white",
-    fontSize:12
-  }
-
+  profileText: {
+    color: "white",
+    fontSize: 12,
+  },
 });

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -21,15 +21,6 @@ interface SwipeStackProps {
   onUndo?: () => void;
 }
 
-/**
- * SwipeStack Component
- *
- * Modern dating app-style UI with:
- * - Profile card taking 100% of screen height
- * - Vertical action panel on right side with Ionicons
- * - Full swipe gesture support
- * - Responsive layout for all devices
- */
 const SwipeStack: React.FC<SwipeStackProps> = ({
   users,
   onSwipe,
@@ -41,6 +32,28 @@ const SwipeStack: React.FC<SwipeStackProps> = ({
   }
 
   const currentUser = users[0];
+
+  // 🔥 NEW: media index state
+  const [mediaIndex, setMediaIndex] = useState(0);
+
+  // 🔥 NEXT PHOTO
+  const handleNext = () => {
+    if (!currentUser?.media) return;
+
+    setMediaIndex((prev) =>
+      prev + 1 < currentUser.media.length ? prev + 1 : prev,
+    );
+  };
+
+  // 🔥 PREVIOUS PHOTO
+  const handlePrev = () => {
+    setMediaIndex((prev) => (prev > 0 ? prev - 1 : prev));
+  };
+
+  // 🔥 RESET WHEN USER CHANGES
+  useEffect(() => {
+    setMediaIndex(0);
+  }, [currentUser]);
 
   const pan = useRef(new Animated.ValueXY()).current;
 
@@ -63,28 +76,24 @@ const SwipeStack: React.FC<SwipeStackProps> = ({
 
         pan.setValue({ x: 0, y: 0 });
       },
-    })
+    }),
   ).current;
 
   return (
     <View style={styles.container}>
       {/* Profile Card */}
-      <Animated.View
-        {...panResponder.panHandlers}
-        style={[styles.cardWrapper]}
-      >
+      <Animated.View {...panResponder.panHandlers} style={[styles.cardWrapper]}>
         <SwipeCard
           user={currentUser}
-          mediaIndex={0}
-          onMediaPrev={() => {}}
-          onMediaNext={() => {}}
+          mediaIndex={mediaIndex} // 🔥 FIXED
+          onMediaPrev={handlePrev} // 🔥 FIXED
+          onMediaNext={handleNext} // 🔥 FIXED
           onPress={onCardPress}
         />
       </Animated.View>
 
-      {/* Right Action Panel - Modern Dating App Style */}
+      {/* Right Action Panel */}
       <View style={styles.actionsPanel}>
-        {/* Super Like Button */}
         <TouchableOpacity
           style={styles.actionBtn}
           onPress={() => onSwipe("superlike")}
@@ -93,7 +102,6 @@ const SwipeStack: React.FC<SwipeStackProps> = ({
           <Ionicons name="star" size={30} color="#FFD700" />
         </TouchableOpacity>
 
-        {/* Like Button */}
         <TouchableOpacity
           style={styles.actionBtn}
           onPress={() => onSwipe("like")}
@@ -102,7 +110,6 @@ const SwipeStack: React.FC<SwipeStackProps> = ({
           <Ionicons name="heart" size={30} color="#ff4d6d" />
         </TouchableOpacity>
 
-        {/* Dislike Button */}
         <TouchableOpacity
           style={styles.actionBtn}
           onPress={() => onSwipe("dislike")}
@@ -111,7 +118,6 @@ const SwipeStack: React.FC<SwipeStackProps> = ({
           <Ionicons name="close" size={30} color="#ff4d6d" />
         </TouchableOpacity>
 
-        {/* Undo Button */}
         <TouchableOpacity
           style={[styles.actionBtn, styles.undoBtn]}
           onPress={onUndo}
@@ -125,11 +131,6 @@ const SwipeStack: React.FC<SwipeStackProps> = ({
 };
 
 const styles = StyleSheet.create({
-  /**
-   * Main container
-   * - Full width and height - covers entire screen
-   * - Uses relative positioning for child layout
-   */
   container: {
     width: "100%",
     height: height,
@@ -138,12 +139,6 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 
-  /**
-   * Profile card wrapper
-   * - Takes 100% of screen height and width to fill completely
-   * - No gaps or background visible
-   * - Covers entire screen
-   */
   cardWrapper: {
     width: "100%",
     height: "100%",
@@ -151,12 +146,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  /**
-   * Right action panel
-   * - Absolute positioning on far right and bottom
-   * - Vertically stacked buttons
-   * - Easy to tap with right thumb
-   */
   actionsPanel: {
     position: "absolute",
     right: 10,
@@ -165,12 +154,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
-  /**
-   * Individual action button styling
-   * - Circular design with semi-transparent background
-   * - Proper spacing and touch targets
-   * - Works on all phone sizes
-   */
   actionBtn: {
     width: 50,
     height: 50,
@@ -182,10 +165,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
 
-  /**
-   * Undo button styling
-   * - Slightly different visual treatment
-   */
   undoBtn: {
     marginTop: 4,
   },

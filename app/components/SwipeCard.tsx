@@ -34,18 +34,15 @@ const SwipeCard = React.memo(
 
     const isVideo = useMemo(
       () => typeof currentMedia === "string" && currentMedia.includes(".mp4"),
-      [currentMedia]
+      [currentMedia],
     );
 
     const totalMedia = user.media?.length || 0;
 
     return (
       <Animated.View style={[styles.card, style]}>
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={onPress}
-          style={{ flex: 1 }}
-        >
+        {/* ❌ REMOVED onPress from here */}
+        <View style={{ flex: 1 }}>
           {isVideo ? (
             <Video
               key={currentMedia}
@@ -65,17 +62,18 @@ const SwipeCard = React.memo(
             />
           )}
 
-          {/* Media tap controls */}
-          <View style={styles.controls}>
+          {/* ✅ TAP CONTROLS FIXED */}
+          <View style={styles.controls} pointerEvents="box-none">
             <TouchableOpacity
               style={styles.sideButton}
-              onPress={onMediaPrev}
-              disabled={mediaIndex === 0}
+              activeOpacity={1}
+              onPressIn={onMediaPrev}
             />
+
             <TouchableOpacity
               style={styles.sideButton}
-              onPress={onMediaNext}
-              disabled={mediaIndex === totalMedia - 1}
+              activeOpacity={1}
+              onPressIn={onMediaNext}
             />
           </View>
 
@@ -94,10 +92,14 @@ const SwipeCard = React.memo(
               />
             ))}
           </View>
-        </TouchableOpacity>
+        </View>
 
-        {/* Profile Info */}
-        <View style={styles.infoOverlay}>
+        {/* ✅ Profile click alag se */}
+        <TouchableOpacity
+          style={styles.infoOverlay}
+          activeOpacity={0.8}
+          onPress={onPress}
+        >
           <Text style={styles.name}>
             {user.name}, {user.age}
           </Text>
@@ -111,10 +113,10 @@ const SwipeCard = React.memo(
           {user.distance !== undefined && (
             <Text style={styles.distance}>📍 {user.distance} km away</Text>
           )}
-        </View>
+        </TouchableOpacity>
       </Animated.View>
     );
-  }
+  },
 );
 
 SwipeCard.displayName = "SwipeCard";
@@ -122,16 +124,16 @@ SwipeCard.displayName = "SwipeCard";
 const styles = StyleSheet.create({
   card: {
     width: "100%",
-    height: 550,
-    borderRadius: 20,
+    height: "100%", // 🔥 FULL SCREEN FIX
+    borderRadius: 0, // 🔥 edge to edge
     overflow: "hidden",
     backgroundColor: "#1a1a1a",
-    elevation: 8,
   },
 
   controls: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: "row",
+    zIndex: 10,
   },
 
   sideButton: {
@@ -140,7 +142,7 @@ const styles = StyleSheet.create({
 
   progressContainer: {
     position: "absolute",
-    top: 8,
+    top: 40,
     left: 8,
     right: 8,
     flexDirection: "row",

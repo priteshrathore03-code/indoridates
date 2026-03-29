@@ -1,10 +1,6 @@
+import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import { useRouter } from "expo-router";
 import {
@@ -45,6 +41,8 @@ type SwipeAction = "like" | "dislike" | "superlike";
 export default function Home() {
   const router = useRouter();
   const { user: myProfile } = useUserProfile();
+  const { focusUser } = useLocalSearchParams();
+  const focusUserId = Array.isArray(focusUser) ? focusUser[0] : focusUser;
 
   const [users, setUsers] = useState<SwipeUser[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -78,9 +76,10 @@ export default function Home() {
       snap.forEach((docSnap) => {
         if (docSnap.id === currentUid) return;
         if (
-          liked.includes(docSnap.id) ||
-          disliked.includes(docSnap.id) ||
-          superliked.includes(docSnap.id)
+          docSnap.id !== focusUser && // 🔥 ye add
+          (liked.includes(docSnap.id) ||
+            disliked.includes(docSnap.id) ||
+            superliked.includes(docSnap.id))
         )
           return;
 
@@ -110,8 +109,8 @@ export default function Home() {
               myProfile.latitude,
               myProfile.longitude,
               data.latitude,
-              data.longitude
-            )
+              data.longitude,
+            ),
           );
         }
 
@@ -139,6 +138,15 @@ export default function Home() {
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
+  useEffect(() => {
+    if (focusUser && users.length > 0) {
+      const index = users.findIndex((u) => u.id === focusUser);
+
+      if (index !== -1) {
+        setCurrentIndex(index);
+      }
+    }
+  }, [focusUser, users]);
 
   const handleSwipe = useCallback(
     async (action: SwipeAction) => {
@@ -153,7 +161,7 @@ export default function Home() {
         if (action === "like" || action === "superlike") {
           await updateDoc(doc(db, "users", myUid), {
             [action === "superlike" ? "superliked" : "liked"]: arrayUnion(
-              target.id
+              target.id,
             ),
           });
 
@@ -166,7 +174,7 @@ export default function Home() {
           const q = query(
             collection(db, "likes"),
             where("from", "==", target.id),
-            where("to", "==", myUid)
+            where("to", "==", myUid),
           );
 
           const snap = await getDocs(q);
@@ -197,7 +205,7 @@ export default function Home() {
         console.error("Swipe error:", error);
       }
     },
-    [users, currentIndex]
+    [users, currentIndex],
   );
 
   const handleUndo = () => {
@@ -247,7 +255,15 @@ export default function Home() {
           <MatchModal
             currentUser={matchPair.currentUser}
             matchedUser={matchPair.matchedUser}
-            onChat={() => {}}
+            onChat={() => {
+              const myUid = auth.currentUser?.uid;
+              const otherId = matchPair.matchedUser.id;
+
+              const roomId = [myUid, otherId].sort().join("_");
+
+              setMatchPair(null); // modal close
+              router.push(`/chat/${roomId}`); // 🔥 chat open
+            }}
             onContinue={() => setMatchPair(null)}
           />
         )}
@@ -259,8 +275,6 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
   },
   center: {
     flex: 1,
