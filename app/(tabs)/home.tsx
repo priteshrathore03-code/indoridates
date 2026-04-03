@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { sendPersonalNotification } from "../../services/notificationService";
 
 import { useRouter } from "expo-router";
 import {
@@ -159,6 +160,7 @@ export default function Home() {
         historyRef.current.push(target);
 
         if (action === "like" || action === "superlike") {
+          // 1. Database Update
           await updateDoc(doc(db, "users", myUid), {
             [action === "superlike" ? "superliked" : "liked"]: arrayUnion(
               target.id,
@@ -171,6 +173,14 @@ export default function Home() {
             type: action,
           });
 
+          // 2. Send "Someone Likes You" Notification
+          await sendPersonalNotification(
+            target.id,
+            action === "superlike" ? "Super Like! ⭐" : "Someone Likes You! ❤️",
+            `${myProfile?.name || "Someone"} ${action === "superlike" ? "super-liked" : "liked"} your profile!`,
+          );
+
+          // 3. Check for Match
           const q = query(
             collection(db, "likes"),
             where("from", "==", target.id),
@@ -186,6 +196,13 @@ export default function Home() {
               users: [myUid, target.id],
               createdAt: Date.now(),
             });
+
+            // 4. Send Match Notification to the other user
+            await sendPersonalNotification(
+              target.id,
+              "It's a Match! 🔥",
+              `You and ${myProfile?.name} have matched! Start chatting now.`,
+            );
 
             setMatchPair({
               currentUser: target,
@@ -205,7 +222,7 @@ export default function Home() {
         console.error("Swipe error:", error);
       }
     },
-    [users, currentIndex],
+    [users, currentIndex, myProfile],
   );
 
   const handleUndo = () => {

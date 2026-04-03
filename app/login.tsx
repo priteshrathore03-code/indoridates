@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../firebaseConfig";
+import { registerForPushNotifications } from "../services/notificationService";
 
 export default function Login() {
   const router = useRouter();
@@ -39,10 +40,24 @@ export default function Login() {
       setLoading(true);
 
       if (isRegister) {
-        await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          email.trim(),
+          password.trim(),
+        );
+
+        await registerForPushNotifications(userCredential.user.uid);
+
         router.replace("/profile-completion");
       } else {
-        await signInWithEmailAndPassword(auth, email.trim(), password.trim());
+        const userCredential = await signInWithEmailAndPassword(
+          auth,
+          email.trim(),
+          password.trim(),
+        );
+
+        await registerForPushNotifications(userCredential.user.uid);
+
         router.replace("/");
       }
     } catch (error: any) {

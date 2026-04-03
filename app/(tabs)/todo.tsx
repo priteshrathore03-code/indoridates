@@ -14,6 +14,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  notifyAllMales,
+  sendPersonalNotification,
+} from "../../services/notificationService";
 
 import { createChatRoom } from "../../data/chatStore";
 import {
@@ -102,6 +106,10 @@ export default function Todo() {
     setTitle("");
     setTime("");
     setBrief("");
+    await notifyAllMales(
+      "New Plan Alert! 🔥",
+      `${user.name} has posted a new plan. Check it out!`,
+    );
     setShowForm(false);
   };
 
@@ -122,15 +130,25 @@ export default function Todo() {
     await updatePlan(plan.id, {
       requests: [...plan.requests, user.uid],
     });
+    await sendPersonalNotification(
+      plan.createdBy,
+      "New Interest! ❤️",
+      `${user.name} is interested in your plan!`,
+    );
     Alert.alert("Success", "Interest sent to the host!");
   };
 
   const handleAccept = async (plan: PlanType, reqUid: string) => {
     if (!plan.id) return;
 
-    // 1. चैट रूम बनाओ
     await createChatRoom(plan.createdBy, reqUid);
-    // 2. प्लान डिलीट करो (ताकि लड़की नया प्लान बना सके और लिस्ट साफ हो जाए)
+
+    await sendPersonalNotification(
+      reqUid,
+      "Plan Accepted! ✅",
+      `${user.name} accepted your request. Let's chat!`,
+    );
+
     await deletePlan(plan.id);
 
     Alert.alert("Accepted!", "Chat room created. Heading to messages...");

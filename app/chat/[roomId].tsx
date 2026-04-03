@@ -34,6 +34,9 @@ import { auth, db } from "../../firebaseConfig";
 import FadeWrapper from "../components/FadeWrapper";
 import IndoreBackground from "../components/IndoreBackground";
 
+// Notification Service Import
+import { sendPersonalNotification } from "../../services/notificationService";
+
 export default function ChatRoom() {
   const router = useRouter();
   const { roomId } = useLocalSearchParams();
@@ -45,7 +48,6 @@ export default function ChatRoom() {
 
   const myUid = auth.currentUser?.uid;
 
-  // 🔥 LOAD USER
   useEffect(() => {
     const loadUser = async () => {
       if (!roomId || !myUid) return;
@@ -65,7 +67,6 @@ export default function ChatRoom() {
     loadUser();
   }, [roomId]);
 
-  // 🔥 CHECK BLOCK (REAL GLOBAL)
   useEffect(() => {
     const checkBlock = async () => {
       if (!myUid || !otherUser) return;
@@ -95,13 +96,11 @@ export default function ChatRoom() {
     checkBlock();
   }, [otherUser]);
 
-  // 🔥 MESSAGES
   useEffect(() => {
     if (!roomId) return;
 
     const q = query(
       collection(db, "messages"),
-
       where("roomId", "==", String(roomId)),
       orderBy("createdAt", "asc"),
     );
@@ -112,7 +111,6 @@ export default function ChatRoom() {
       for (const d of snap.docs) {
         const data = d.data();
 
-        // 🔥 READ LOGIC (AUTO)
         if (data.senderId !== myUid && data.status !== "read") {
           await updateDoc(doc(db, "messages", d.id), {
             status: "read",
@@ -129,20 +127,27 @@ export default function ChatRoom() {
   }, [roomId]);
 
   const sendMessage = async () => {
-    if (!text.trim() || blocked) return;
+    if (!text.trim() || blocked || !otherUser) return;
+
+    const messageText = text;
+    setText("");
 
     await addDoc(collection(db, "messages"), {
       roomId: String(roomId),
       senderId: myUid,
-      text,
+      text: messageText,
       createdAt: serverTimestamp(),
-      status: "sent", // 🔥 ADD THIS
+      status: "sent",
     });
 
-    setText("");
+    // Send Notification to the other user
+    await sendPersonalNotification(
+      otherUser.uid,
+      `New message from ${otherUser.name}`,
+      messageText,
+    );
   };
 
-  // 🔥 OPTIONS (BLOCK / UNBLOCK / REPORT)
   const handleOptions = async () => {
     if (!myUid || !otherUser) return;
 
@@ -173,7 +178,6 @@ export default function ChatRoom() {
     } else {
       Alert.alert("Options", "Choose action", [
         { text: "Cancel", style: "cancel" },
-
         {
           text: "Report",
           onPress: async () => {
@@ -186,7 +190,6 @@ export default function ChatRoom() {
             Alert.alert("Reported 🚨");
           },
         },
-
         {
           text: "Block",
           style: "destructive",
@@ -214,7 +217,6 @@ export default function ChatRoom() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             keyboardVerticalOffset={30}
           >
-            {/* 🔥 HEADER */}
             <View style={styles.header}>
               <TouchableOpacity onPress={() => router.replace("/(tabs)/chat")}>
                 <Text style={{ color: "white", fontSize: 18 }}>←</Text>
@@ -245,14 +247,12 @@ export default function ChatRoom() {
               </TouchableOpacity>
             </View>
 
-            {/* 🔥 BLOCKED TEXT */}
             {blocked && (
               <Text style={styles.blockedText}>
                 You cannot chat with this user 🚫
               </Text>
             )}
 
-            {/* 🔥 MESSAGES */}
             <FlatList
               data={messages}
               keyExtractor={(item) => item.id}
@@ -286,7 +286,6 @@ export default function ChatRoom() {
               }}
             />
 
-            {/* 🔥 INPUT */}
             <View style={styles.inputRow}>
               <TextInput
                 value={text}
@@ -331,7 +330,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-
   msg: {
     padding: 10,
     marginVertical: 6,
@@ -346,13 +344,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#444",
     alignSelf: "flex-start",
   },
-
   blockedText: {
     color: "red",
     textAlign: "center",
     margin: 10,
   },
-
   inputRow: {
     flexDirection: "row",
     padding: 10,
