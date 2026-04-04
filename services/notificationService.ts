@@ -5,13 +5,12 @@ import {
   getDoc,
   getDocs,
   query,
-  updateDoc,
+  setDoc,
   where,
 } from "firebase/firestore";
 import { Platform } from "react-native";
 import { db } from "../firebaseConfig";
 
-/* ---------------- PERSONAL NOTIFICATION ---------------- */
 export const sendPersonalNotification = async (
   targetUid: string,
   title: string,
@@ -34,15 +33,12 @@ export const sendPersonalNotification = async (
           sound: "default",
         }),
       });
-
-      console.log("Personal notification sent successfully");
     }
   } catch (error) {
     console.error("Error sending personal notification:", error);
   }
 };
 
-/* ---------------- NOTIFY ALL MALES ---------------- */
 export const notifyAllMales = async (title: string, body: string) => {
   try {
     const q = query(collection(db, "users"), where("gender", "==", "male"));
@@ -53,9 +49,7 @@ export const notifyAllMales = async (title: string, body: string) => {
 
     querySnapshot.forEach((item) => {
       const token = item.data()?.pushToken;
-      if (token) {
-        tokens.push(token);
-      }
+      if (token) tokens.push(token);
     });
 
     if (tokens.length > 0) {
@@ -71,15 +65,12 @@ export const notifyAllMales = async (title: string, body: string) => {
           sound: "default",
         }),
       });
-
-      console.log("All male users notified");
     }
   } catch (error) {
     console.error("Error notifying all males:", error);
   }
 };
 
-/* ---------------- REGISTER PUSH TOKEN ---------------- */
 export const registerForPushNotifications = async (userId: string) => {
   try {
     if (Platform.OS === "android") {
@@ -98,29 +89,23 @@ export const registerForPushNotifications = async (userId: string) => {
 
     if (existingStatus !== "granted") {
       const { status } = await Notifications.requestPermissionsAsync();
-
       finalStatus = status;
     }
 
-    console.log("Permission status:", finalStatus);
-
-    if (finalStatus !== "granted") {
-      console.log("Notification permission denied");
-      return;
-    }
+    if (finalStatus !== "granted") return;
 
     const tokenData = await Notifications.getExpoPushTokenAsync();
 
     const token = tokenData.data;
 
-    console.log("Expo Push Token:", token);
-
     if (token && userId) {
-      const userRef = doc(db, "users", userId);
-
-      await updateDoc(userRef, {
-        pushToken: token,
-      });
+      await setDoc(
+        doc(db, "users", userId),
+        {
+          pushToken: token,
+        },
+        { merge: true },
+      );
 
       console.log("Token saved successfully!");
     }
