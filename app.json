@@ -10,7 +10,8 @@
     "plugins": ["expo-router"],
     "android": {
       "package": "com.indoridates.app",
-      "versionCode": 2
+      "versionCode": 2,
+      "googleServicesFile": "./google-services.json"
     },
     "ios": {
       "bundleIdentifier": "com.indoridates.app",
