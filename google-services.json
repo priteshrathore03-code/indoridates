@@ -12,7 +12,20 @@
           "package_name": "com.indoridates.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "860588660053-d2rlbi3speugkp1so0l1juvihpgd47pc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.indoridates.app",
+            "certificate_hash": "ea05b0a7e40efd68e851eac443248907d0777940"
+          }
+        },
+        {
+          "client_id": "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAMY6AWM6ZPZcVNjs1AHqXcOTUQR3PV2rM"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

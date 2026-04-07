@@ -1,9 +1,14 @@
+import * as Google from "expo-auth-session/providers/google";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import {
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  sendPasswordResetEmail,
+  signInWithCredential,
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +25,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../firebaseConfig";
 import { registerForPushNotifications } from "../services/notificationService";
 
+WebBrowser.maybeCompleteAuthSession();
+
 export default function Login() {
   const router = useRouter();
 
@@ -27,6 +34,48 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId: "YOUR_ANDROID_CLIENT_ID",
+    webClientId: "YOUR_WEB_CLIENT_ID",
+  });
+
+  useEffect(() => {
+    const handleGoogleLogin = async () => {
+      try {
+        if (response?.type === "success") {
+          const { id_token } = response.params;
+
+          const credential = GoogleAuthProvider.credential(id_token);
+
+          const userCredential = await signInWithCredential(auth, credential);
+
+          await registerForPushNotifications(userCredential.user.uid);
+
+          router.replace("/");
+        }
+      } catch (error: any) {
+        Alert.alert("Google Login Error", error.message);
+      }
+    };
+
+    handleGoogleLogin();
+  }, [response]);
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert("Enter your email first");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+
+      Alert.alert("Success", "Password reset email sent successfully");
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    }
+  };
 
   const handleAuth = async () => {
     if (loading) return;
@@ -116,6 +165,17 @@ export default function Login() {
               )}
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.googleButton}
+              onPress={() => promptAsync()}
+            >
+              <Text style={styles.buttonText}>Continue with Google</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleForgotPassword}>
+              <Text style={styles.forgotText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity onPress={() => setIsRegister(!isRegister)}>
               <Text style={styles.switchText}>
                 {isRegister
@@ -136,19 +196,16 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-
   image: {
     width: "100%",
     height: "100%",
   },
-
   overlay: {
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 20,
     backgroundColor: "rgba(0,0,0,0.35)",
   },
-
   card: {
     backgroundColor: "rgba(255,255,255,0.15)",
     padding: 30,
@@ -156,7 +213,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)",
   },
-
   title: {
     fontSize: 26,
     fontWeight: "bold",
@@ -164,7 +220,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "white",
   },
-
   input: {
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.4)",
@@ -174,7 +229,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     color: "white",
   },
-
   button: {
     backgroundColor: "#ff4d6d",
     padding: 15,
@@ -182,13 +236,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 15,
   },
-
+  googleButton: {
+    backgroundColor: "#4285F4",
+    padding: 15,
+    borderRadius: 12,
+    alignItems: "center",
+    marginBottom: 15,
+  },
   buttonText: {
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
   },
-
+  forgotText: {
+    textAlign: "center",
+    color: "#FFD700",
+    fontWeight: "600",
+    marginBottom: 15,
+  },
   switchText: {
     textAlign: "center",
     color: "#fff",
