@@ -46,45 +46,65 @@ export default function Todo() {
   const [time, setTime] = useState("");
   const [brief, setBrief] = useState("");
 
-  // चेक करने के लिए कि क्या लड़की का कोई प्लान पहले से एक्टिव है
   const hasActivePlan = plans.some((p) => p.createdBy === user?.uid);
 
   useEffect(() => {
     const unsubscribe = listenPlans(async (data) => {
-      setPlans(data);
-      await fetchUsers(data);
+      const now = Date.now();
+
+      const validPlans = data.filter((plan) => {
+        const expired = now - plan.createdAt > 24 * 60 * 60 * 1000;
+
+        if (expired && plan.id) {
+          deletePlan(plan.id);
+          return false;
+        }
+
+        return true;
+      });
+
+      setPlans(validPlans);
+      await fetchUsers(validPlans);
     });
+
     return () => unsubscribe();
   }, []);
 
   const fetchUsers = async (plansData: PlanType[]) => {
-    const map: any = { ...usersMap };
-    let changed = false;
+    const map: any = {};
 
     for (const plan of plansData) {
-      // प्लान बनाने वाले का डेटा
       if (!map[plan.createdBy]) {
         const snap = await getDoc(doc(db, "users", plan.createdBy));
         if (snap.exists()) {
           map[plan.createdBy] = snap.data();
-          changed = true;
         }
       }
-      // रिक्वेस्ट भेजने वालों का डेटा
+
       for (const reqUid of plan.requests) {
         if (!map[reqUid]) {
           const snap = await getDoc(doc(db, "users", reqUid));
           if (snap.exists()) {
             map[reqUid] = snap.data();
-            changed = true;
           }
         }
       }
     }
-    if (changed) setUsersMap(map);
+
+    setUsersMap(map);
   };
 
   if (!user) return null;
+
+  const visiblePlans = plans.filter((plan) => {
+    const isMyPlan = plan.createdBy === user.uid;
+
+    if (user.gender === "female") {
+      return isMyPlan;
+    }
+
+    return plan.status === "open";
+  });
 
   const handleCreate = async () => {
     if (!title || !time || !brief) {
@@ -106,10 +126,12 @@ export default function Todo() {
     setTitle("");
     setTime("");
     setBrief("");
+
     await notifyAllMales(
       "New Plan Alert! 🔥",
       `${user.name} has posted a new plan. Check it out!`,
     );
+
     setShowForm(false);
   };
 
@@ -122,6 +144,7 @@ export default function Todo() {
 
   const handleInterested = async (plan: PlanType) => {
     if (!plan.id) return;
+
     if (plan.requests.includes(user.uid)) {
       Alert.alert("Already Sent", "You have already requested to join.");
       return;
@@ -130,11 +153,13 @@ export default function Todo() {
     await updatePlan(plan.id, {
       requests: [...plan.requests, user.uid],
     });
+
     await sendPersonalNotification(
       plan.createdBy,
       "New Interest! ❤️",
       `${user.name} is interested in your plan!`,
     );
+
     Alert.alert("Success", "Interest sent to the host!");
   };
 
@@ -148,6 +173,16 @@ export default function Todo() {
       "Plan Accepted! ✅",
       `${user.name} accepted your request. Let's chat!`,
     );
+
+    const otherUsers = plan.requests.filter((uid) => uid !== reqUid);
+
+    for (const uid of otherUsers) {
+      await sendPersonalNotification(
+        uid,
+        "Plan Closed ❌",
+        "This plan has already been accepted by someone else.",
+      );
+    }
 
     await deletePlan(plan.id);
 
@@ -163,13 +198,12 @@ export default function Todo() {
             style={styles.container}
             contentContainerStyle={{ paddingBottom: 120 }}
           >
-            {plans.map((plan) => {
+            {visiblePlans.map((plan) => {
               const creator = usersMap[plan.createdBy];
               const isMyPlan = plan.createdBy === user.uid;
 
               return (
                 <View key={plan.id} style={styles.card}>
-                  {/* HEADER: Profile & Actions */}
                   <View style={styles.cardHeader}>
                     <TouchableOpacity
                       style={styles.profileRow}
@@ -191,7 +225,6 @@ export default function Todo() {
                       </View>
                     </TouchableOpacity>
 
-                    {/* DELETE OPTION (ONLY FOR CREATOR) */}
                     {isMyPlan && (
                       <TouchableOpacity onPress={() => handleDelete(plan.id!)}>
                         <Feather name="trash-2" size={20} color="#ff416c" />
@@ -202,7 +235,6 @@ export default function Todo() {
                   <Text style={styles.title}>{plan.title}</Text>
                   <Text style={styles.brief}>{plan.brief}</Text>
 
-                  {/* BOYS VIEW: Interest Button */}
                   {!isMyPlan && (
                     <TouchableOpacity
                       style={[
@@ -220,14 +252,15 @@ export default function Todo() {
                     </TouchableOpacity>
                   )}
 
-                  {/* GIRLS VIEW: Request List with Profile Photos */}
                   {isMyPlan && plan.requests.length > 0 && (
                     <View style={styles.requestSection}>
                       <Text style={styles.requestCount}>
                         Requests ({plan.requests.length})
                       </Text>
+
                       {plan.requests.map((reqUid) => {
                         const reqUser = usersMap[reqUid];
+
                         return (
                           <View key={reqUid} style={styles.reqUserRow}>
                             <TouchableOpacity
@@ -263,11 +296,11 @@ export default function Todo() {
             })}
           </ScrollView>
 
-          {/* CREATE PLAN MODAL */}
           {showForm && (
             <View style={styles.overlay}>
               <View style={styles.formCard}>
                 <Text style={styles.formTitle}>Post a Plan</Text>
+
                 <View style={styles.inputBox}>
                   <Feather name="edit-2" size={18} color="#fff" />
                   <TextInput
@@ -278,6 +311,7 @@ export default function Todo() {
                     onChangeText={setTitle}
                   />
                 </View>
+
                 <View style={styles.inputBox}>
                   <Feather name="clock" size={18} color="#fff" />
                   <TextInput
@@ -288,6 +322,7 @@ export default function Todo() {
                     onChangeText={setTime}
                   />
                 </View>
+
                 <View style={styles.inputBox}>
                   <Feather name="file-text" size={18} color="#fff" />
                   <TextInput
@@ -298,6 +333,7 @@ export default function Todo() {
                     onChangeText={setBrief}
                   />
                 </View>
+
                 <TouchableOpacity onPress={handleCreate}>
                   <LinearGradient
                     colors={["#ffb347", "#ff416c", "#ff2d95"]}
@@ -306,6 +342,7 @@ export default function Todo() {
                     <Text style={styles.saveText}>Post Now</Text>
                   </LinearGradient>
                 </TouchableOpacity>
+
                 <TouchableOpacity onPress={() => setShowForm(false)}>
                   <Text style={styles.cancel}>Cancel</Text>
                 </TouchableOpacity>
@@ -313,7 +350,6 @@ export default function Todo() {
             </View>
           )}
 
-          {/* CREATE BUTTON (ONLY FOR FEMALE AND IF NO ACTIVE PLAN) */}
           {!showForm && user.gender === "female" && !hasActivePlan && (
             <TouchableOpacity
               onPress={() => setShowForm(true)}
@@ -370,8 +406,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   btnText: { color: "white", fontWeight: "bold" },
-
-  // Request Styles
   requestSection: {
     marginTop: 20,
     borderTopWidth: 1,
@@ -403,7 +437,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   smallBtnText: { color: "white", fontWeight: "bold", fontSize: 12 },
-
   overlay: {
     position: "absolute",
     bottom: 0,
