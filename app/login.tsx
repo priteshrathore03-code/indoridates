@@ -1,12 +1,8 @@
-import * as Google from "expo-auth-session/providers/google";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import {
-  createUserWithEmailAndPassword,
-  GoogleAuthProvider,
-  sendPasswordResetEmail,
-  signInWithCredential,
-  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, GoogleAuthProvider, sendEmailVerification,
+  sendPasswordResetEmail, signInWithCredential, signInWithEmailAndPassword
 } from "firebase/auth";
 import { useEffect, useState } from "react";
 import {
@@ -25,42 +21,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../firebaseConfig";
 import { registerForPushNotifications } from "../services/notificationService";
 
-WebBrowser.maybeCompleteAuthSession();
-
 export default function Login() {
   const router = useRouter();
+
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId:
+        "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
+    });
+  }, []);
 
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: "YOUR_ANDROID_CLIENT_ID",
-    webClientId: "YOUR_WEB_CLIENT_ID",
-  });
-
-  useEffect(() => {
-    const handleGoogleLogin = async () => {
-      try {
-        if (response?.type === "success") {
-          const { id_token } = response.params;
-
-          const credential = GoogleAuthProvider.credential(id_token);
-
-          const userCredential = await signInWithCredential(auth, credential);
-
-          await registerForPushNotifications(userCredential.user.uid);
-
-          router.replace("/");
-        }
-      } catch (error: any) {
-        Alert.alert("Google Login Error", error.message);
-      }
-    };
-
-    handleGoogleLogin();
-  }, [response]);
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
@@ -71,7 +45,10 @@ export default function Login() {
     try {
       await sendPasswordResetEmail(auth, email.trim());
 
-      Alert.alert("Success", "Password reset email sent successfully");
+      Alert.alert(
+        "Success",
+        "Password reset link sent. Check Inbox, Spam, or Promotions.",
+      );
     } catch (error: any) {
       Alert.alert("Error", error.message);
     }
@@ -95,15 +72,28 @@ export default function Login() {
           password.trim(),
         );
 
-        await registerForPushNotifications(userCredential.user.uid);
+        await sendEmailVerification(userCredential.user);
 
-        router.replace("/profile-completion");
+        Alert.alert(
+          "Verify Email",
+          "Verification email sent. Please check Inbox, Spam, or Promotions folder before login.",
+        );
+
+        return;
       } else {
         const userCredential = await signInWithEmailAndPassword(
           auth,
           email.trim(),
           password.trim(),
         );
+
+        if (!userCredential.user.emailVerified) {
+          Alert.alert(
+            "Email Not Verified",
+            "Please verify your email before login.",
+          );
+          return;
+        }
 
         await registerForPushNotifications(userCredential.user.uid);
 
@@ -167,7 +157,25 @@ export default function Login() {
 
             <TouchableOpacity
               style={styles.googleButton}
-              onPress={() => promptAsync()}
+              onPress={async () => {
+                try {
+                  await GoogleSignin.hasPlayServices();
+                  const userInfo = await GoogleSignin.signIn();
+                  const idToken = userInfo.data?.idToken;
+
+                  const credential = GoogleAuthProvider.credential(idToken);
+
+                  await signInWithCredential(auth, credential);
+
+                  router.replace("/");
+
+                  console.log("GOOGLE USER:", userInfo);
+
+                  router.replace("/");
+                } catch (error) {
+                  console.log("GOOGLE LOGIN ERROR:", error);
+                }
+              }}
             >
               <Text style={styles.buttonText}>Continue with Google</Text>
             </TouchableOpacity>
@@ -175,7 +183,9 @@ export default function Login() {
             <TouchableOpacity onPress={handleForgotPassword}>
               <Text style={styles.forgotText}>Forgot Password?</Text>
             </TouchableOpacity>
-
+            <Text style={styles.noteText}>
+              Check Inbox / Spam / Promotions for email
+            </Text>
             <TouchableOpacity onPress={() => setIsRegister(!isRegister)}>
               <Text style={styles.switchText}>
                 {isRegister
@@ -253,6 +263,12 @@ const styles = StyleSheet.create({
     color: "#FFD700",
     fontWeight: "600",
     marginBottom: 15,
+  },
+  noteText: {
+    textAlign: "center",
+    color: "#ddd",
+    fontSize: 12,
+    marginBottom: 12,
   },
   switchText: {
     textAlign: "center",
