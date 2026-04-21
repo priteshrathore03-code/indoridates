@@ -1,8 +1,10 @@
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { useRouter } from "expo-router";
 import {
-  createUserWithEmailAndPassword, GoogleAuthProvider, sendEmailVerification,
-  sendPasswordResetEmail, signInWithCredential, signInWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword
 } from "firebase/auth";
 import { useEffect, useState } from "react";
 import {
@@ -87,13 +89,13 @@ export default function Login() {
           password.trim(),
         );
 
-        if (!userCredential.user.emailVerified) {
-          Alert.alert(
-            "Email Not Verified",
-            "Please verify your email before login.",
-          );
-          return;
-        }
+        // if (!userCredential.user.emailVerified) {
+//   Alert.alert(
+//     "Email Not Verified",
+//     "Please verify your email before login.",
+//   );
+//   return;
+// }
 
         await registerForPushNotifications(userCredential.user.uid);
 
@@ -154,7 +156,7 @@ export default function Login() {
                 </Text>
               )}
             </TouchableOpacity>
-
+{/*
             <TouchableOpacity
               style={styles.googleButton}
               onPress={async () => {
@@ -179,7 +181,7 @@ export default function Login() {
             >
               <Text style={styles.buttonText}>Continue with Google</Text>
             </TouchableOpacity>
-
+*/}
             <TouchableOpacity onPress={handleForgotPassword}>
               <Text style={styles.forgotText}>Forgot Password?</Text>
             </TouchableOpacity>

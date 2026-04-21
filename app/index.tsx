@@ -11,7 +11,6 @@ export default function Index() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log("AUTH USER:", user);
 
       if (!user) {
         router.replace("/welcome");
@@ -22,11 +21,15 @@ export default function Index() {
       try {
         const snap = await getDoc(doc(db, "users", user.uid));
 
-        if (snap.exists()) {
-          router.replace("/(tabs)/home");
+        const data = snap.data();
+
+        // 🔥 FINAL LOGIC
+        if (!snap.exists() || !data?.isProfileComplete) {
+          router.replace("/profile-completion"); // onboarding start
         } else {
-          router.replace("/profile-completion");
+          router.replace("/(tabs)/home"); // normal app
         }
+
       } catch (e) {
         console.log("INDEX ERROR:", e);
       }

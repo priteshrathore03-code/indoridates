@@ -9,7 +9,7 @@ export default function GetStart() {
       <Text style={{ fontSize: 24, marginBottom: 20 }}>
         Welcome to IndoriDates 💘
       </Text>
-      <Button title="Get Started" onPress={() => router.push("/phone")} />
+      <Button title="Get Started" onPress={() => router.push("/login")} />
     </View>
   );
 }
