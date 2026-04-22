@@ -3,6 +3,7 @@ import * as Location from "expo-location";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { useEffect } from "react";
+import { Platform } from "react-native";
 import { auth, db } from "../firebaseConfig";
 
 export default function useAutoLocation() {
@@ -14,37 +15,61 @@ export default function useAutoLocation() {
       }
 
       try {
-        // 1️⃣ Permission
-        const { status } = await Location.requestForegroundPermissionsAsync();
+        let coords: { latitude: number; longitude: number };
 
-        if (status !== "granted") {
-          console.log("❌ Location permission denied");
-          return;
+        if (Platform.OS === "web") {
+          // Web: Use browser's geolocation API
+          coords = await new Promise((resolve, reject) => {
+            if (!navigator.geolocation) {
+              reject(new Error("Geolocation not supported"));
+              return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                resolve({
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                });
+              },
+              (error) => {
+                console.log("❌ Web geolocation permission denied:", error.message);
+                reject(error);
+              }
+            );
+          });
+        } else {
+          // Mobile: Use expo-location
+          const { status } = await Location.requestForegroundPermissionsAsync();
+
+          if (status !== "granted") {
+            console.log("❌ Location permission denied");
+            return;
+          }
+
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+
+          coords = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
         }
-
-        // 2️⃣ Get location
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-
-        const coords = {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-        };
 
         console.log("📍 LOCATION:", coords);
 
-        // 3️⃣ Save local
+        // Save local
         await AsyncStorage.setItem("user_location", JSON.stringify(coords));
 
-        // 4️⃣ Firestore me force update
+        // Update Firestore
         await setDoc(
           doc(db, "profiles", user.uid),
           {
             location: coords,
             updatedAt: new Date(),
           },
-          { merge: true }, // 👈 IMPORTANT (overwrite nahi karega pura doc)
+          { merge: true }
         );
 
         console.log("✅ AUTO location updated (login)");

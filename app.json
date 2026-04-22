@@ -22,7 +22,11 @@
     },
     "ios": {
       "bundleIdentifier": "com.indoridates.app",
-      "buildNumber": "2"
+      "buildNumber": "2",
+      "config": {
+        "googleMapsApiKey": "AIzaSyAMY6AWM6ZPZcVNjs1AHqXcOTUQR3PV2rM"
+      },
+      "usesIcloudStorage": false
     },
     "extra": {
       "router": {},

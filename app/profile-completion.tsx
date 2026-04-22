@@ -1,4 +1,5 @@
 import { useRouter } from "expo-router";
+import { signOut } from "firebase/auth";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -9,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { auth } from "../firebaseConfig";
 import { useUserProfile } from "../data/userProfile";
 import FadeWrapper from "./components/FadeWrapper";
 import IndoreBackground from "./components/IndoreBackground";
@@ -45,6 +47,15 @@ export default function ProfileCompletion() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.replace("/welcome");
+    } catch (error: any) {
+      Alert.alert("Logout Error", error.message);
+    }
+  };
+
   return (
     <IndoreBackground>
       <FadeWrapper>
@@ -78,6 +89,13 @@ export default function ProfileCompletion() {
               ) : (
                 <Text style={styles.btnText}>Next</Text>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={handleLogout}
+            >
+              <Text style={styles.logoutBtnText}>Logout</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -131,5 +149,21 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
+  },
+
+  logoutButton: {
+    backgroundColor: "rgba(255, 77, 109, 0.4)",
+    padding: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 15,
+    borderWidth: 1,
+    borderColor: "#ff4d6d",
+  },
+
+  logoutBtnText: {
+    color: "#ff4d6d",
+    fontWeight: "600",
+    fontSize: 14,
   },
 });

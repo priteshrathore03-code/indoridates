@@ -2,9 +2,12 @@ import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { useRouter } from "expo-router";
 import {
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
   sendEmailVerification,
   sendPasswordResetEmail,
-  signInWithEmailAndPassword
+  signInWithCredential,
+  signInWithEmailAndPassword,
+  signInWithPopup,
 } from "firebase/auth";
 import { useEffect, useState } from "react";
 import {
@@ -27,10 +30,18 @@ export default function Login() {
   const router = useRouter();
 
   useEffect(() => {
-    GoogleSignin.configure({
-      webClientId:
-        "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
-    });
+    if (Platform.OS !== "web") {
+      GoogleSignin.configure({
+        webClientId:
+          "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
+        // For iOS, the webClientId above is used for authentication
+        // Ensure GoogleService-Info.plist is added to Xcode for native iOS features
+        offlineAccess: true,
+        hostedDomain: "",
+        forceCodeForRefreshToken: true,
+        accountName: "",
+      });
+    }
   }, []);
 
   const [isRegister, setIsRegister] = useState(false);
@@ -53,6 +64,62 @@ export default function Login() {
       );
     } catch (error: any) {
       Alert.alert("Error", error.message);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    if (loading) return;
+
+    try {
+      setLoading(true);
+      console.log("Starting Google Sign-In...");
+
+      let userCredential;
+
+      if (Platform.OS === "web") {
+        // Web-based Google Sign-In using Firebase popup
+        console.log("Using web-based Google authentication");
+        const provider = new GoogleAuthProvider();
+        userCredential = await signInWithPopup(auth, provider);
+        console.log("Web Google Sign-In successful:", userCredential.user.email);
+      } else {
+        // Native (React Native) Google Sign-In
+        console.log("Using native Google authentication");
+        
+        // Check if Google Play Services are available
+        await GoogleSignin.hasPlayServices();
+        console.log("Google Play Services available");
+
+        // Sign in with Google
+        const userInfo = await GoogleSignin.signIn();
+        console.log("Native Google Sign-In successful:", userInfo.data?.user?.email);
+
+        // Get ID token for Firebase authentication
+        const idToken = userInfo.data?.idToken;
+        if (!idToken) {
+          throw new Error("No ID token received from Google Sign-In");
+        }
+
+        // Create Firebase credential
+        const credential = GoogleAuthProvider.credential(idToken);
+        console.log("Firebase credential created");
+
+        // Sign in with Firebase using Google credential
+        userCredential = await signInWithCredential(auth, credential);
+        console.log("Native Firebase authentication successful:", userCredential.user.email);
+      }
+
+      // Register for push notifications
+      await registerForPushNotifications(userCredential.user.uid);
+      console.log("Push notifications registered");
+
+      // Navigate to home screen
+      router.replace("/");
+    } catch (error: any) {
+      console.error("Google Login Error:", error.message);
+      Alert.alert("Google Sign-In Error", error.message || "Failed to sign in with Google. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -156,32 +223,18 @@ export default function Login() {
                 </Text>
               )}
             </TouchableOpacity>
-{/*
+
             <TouchableOpacity
               style={styles.googleButton}
-              onPress={async () => {
-                try {
-                  await GoogleSignin.hasPlayServices();
-                  const userInfo = await GoogleSignin.signIn();
-                  const idToken = userInfo.data?.idToken;
-
-                  const credential = GoogleAuthProvider.credential(idToken);
-
-                  await signInWithCredential(auth, credential);
-
-                  router.replace("/");
-
-                  console.log("GOOGLE USER:", userInfo);
-
-                  router.replace("/");
-                } catch (error) {
-                  console.log("GOOGLE LOGIN ERROR:", error);
-                }
-              }}
+              onPress={handleGoogleLogin}
+              disabled={loading}
             >
-              <Text style={styles.buttonText}>Continue with Google</Text>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Continue with Google</Text>
+              )}
             </TouchableOpacity>
-*/}
             <TouchableOpacity onPress={handleForgotPassword}>
               <Text style={styles.forgotText}>Forgot Password?</Text>
             </TouchableOpacity>

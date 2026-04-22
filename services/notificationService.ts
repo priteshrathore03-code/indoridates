@@ -73,6 +73,13 @@ export const notifyAllMales = async (title: string, body: string) => {
 
 export const registerForPushNotifications = async (userId: string) => {
   try {
+    // Web doesn't support Expo push notifications natively
+    if (Platform.OS === "web") {
+      console.log("Push notifications not available on web");
+      // You can implement browser notifications here if needed
+      return;
+    }
+
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {
         name: "default",
@@ -107,9 +114,9 @@ export const registerForPushNotifications = async (userId: string) => {
         { merge: true },
       );
 
-      console.log("Token saved successfully!");
+      console.log("✅ Push token saved successfully!");
     }
   } catch (error) {
-    console.error("Token error:", error);
+    console.error("❌ Token registration error:", error);
   }
 };
