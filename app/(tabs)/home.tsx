@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { sendPersonalNotification } from "../../services/notificationService";
 
 import { useRouter } from "expo-router";
@@ -127,7 +127,13 @@ export default function Home() {
           gender: data.gender,
         });
       });
-
+list.forEach((user) => {
+  user.media.forEach((url) => {
+    if (url && url.startsWith("http")) {
+      Image.prefetch(url);
+    }
+  });
+});
       setUsers(list);
     } catch (error) {
       console.error("Error loading users:", error);

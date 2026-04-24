@@ -1,8 +1,9 @@
 import { ResizeMode, Video } from "expo-av";
-import { Image } from "expo-image";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -37,11 +38,10 @@ const SwipeCard = React.memo(
       [currentMedia],
     );
 
-    const totalMedia = user.media?.length || 0;
+    const [loaded, setLoaded] = useState(false);
 
     return (
       <Animated.View style={[styles.card, style]}>
-        {/* ❌ REMOVED onPress from here */}
         <View style={{ flex: 1 }}>
           {isVideo ? (
             <Video
@@ -53,23 +53,32 @@ const SwipeCard = React.memo(
               isLooping
             />
           ) : (
-            <Image
-              key={currentMedia}
-              source={{ uri: currentMedia }}
-              style={StyleSheet.absoluteFillObject}
-              contentFit="cover"
-              contentPosition="center"
-            />
+            <View style={styles.imageContainer}>
+              {!loaded && (
+                <ActivityIndicator
+                  size="large"
+                  color="#fff"
+                  style={styles.loader}
+                />
+              )}
+
+              <Image
+                key={currentMedia}
+                source={{ uri: currentMedia }}
+                style={StyleSheet.absoluteFillObject}
+                resizeMode="cover"
+                onLoad={() => setLoaded(true)}
+              />
+            </View>
           )}
 
-          {/* ✅ TAP CONTROLS FIXED */}
+          {/* Tap Controls */}
           <View style={styles.controls} pointerEvents="box-none">
             <TouchableOpacity
               style={styles.sideButton}
               activeOpacity={1}
               onPressIn={onMediaPrev}
             />
-
             <TouchableOpacity
               style={styles.sideButton}
               activeOpacity={1}
@@ -94,7 +103,7 @@ const SwipeCard = React.memo(
           </View>
         </View>
 
-        {/* ✅ Profile click alag se */}
+        {/* Info */}
         <TouchableOpacity
           style={styles.infoOverlay}
           activeOpacity={0.8}
@@ -124,10 +133,21 @@ SwipeCard.displayName = "SwipeCard";
 const styles = StyleSheet.create({
   card: {
     width: "100%",
-    height: "100%", // 🔥 FULL SCREEN FIX
-    borderRadius: 0, // 🔥 edge to edge
+    height: "100%",
+    borderRadius: 0,
     overflow: "hidden",
     backgroundColor: "#1a1a1a",
+  },
+
+  imageContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
+
+  loader: {
+    position: "absolute",
   },
 
   controls: {

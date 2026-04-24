@@ -14,6 +14,7 @@ import { auth, db } from "../firebaseConfig";
 
 export type UserProfileState = {
   uid: string;
+  email?: string;
   name?: string;
   age?: number;
   phone?: string;
@@ -25,9 +26,10 @@ export type UserProfileState = {
   latitude?: number;
   longitude?: number;
 
-  // 🔥 NEW
   warnings?: number;
   banned?: boolean;
+
+  isProfileComplete?: boolean;
 };
 
 type UserContextType = {
@@ -45,6 +47,8 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
+
       if (!firebaseUser) {
         setUser(null);
         setLoading(false);
@@ -55,46 +59,33 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
         const userRef = doc(db, "users", firebaseUser.uid);
         const snap = await getDoc(userRef);
 
-        if (snap.exists()) {
-          const data = snap.data() as any;
-
-          // 🔥 अगर fields missing है → add कर दे
-          if (data.warnings === undefined || data.banned === undefined) {
-            await setDoc(
-              userRef,
-              {
-                warnings: data.warnings ?? 0,
-                banned: data.banned ?? false,
-              },
-              { merge: true },
-            );
-          }
-
-          // 🚫 BAN CHECK
-          if (data.banned) {
-            alert("Account blocked 🚫");
-            await signOut(auth);
-            return;
-          }
-
+        if (!snap.exists()) {
           setUser({
             uid: firebaseUser.uid,
-            ...data,
+            email: firebaseUser.email || "",
+            isProfileComplete: false,
           });
-        } else {
-          // 🔥 NEW USER → create with defaults
-          await setDoc(userRef, {
-            uid: firebaseUser.uid,
-            warnings: 0,
-            banned: false,
-          });
-
-          setUser({
-            uid: firebaseUser.uid,
-            warnings: 0,
-            banned: false,
-          });
+          setLoading(false);
+          return;
         }
+
+        const data = snap.data();
+
+        if (data.banned) {
+          alert("Account blocked 🚫");
+          await signOut(auth);
+          return;
+        }
+
+        const isComplete = !!(data.name && Array.isArray(data.photos) && data.photos.length >= 1);
+
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || data.email || "",
+          ...data,
+          isProfileComplete: isComplete,
+        } as UserProfileState);
+
       } catch (e) {
         console.log("USER FETCH ERROR:", e);
       } finally {
@@ -105,7 +96,6 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
     return unsubscribe;
   }, []);
 
-  // 🔥 SAVE PROFILE + LOCATION
   const saveProfile = async (profile: Partial<UserProfileState>) => {
     if (!auth.currentUser) return;
 
@@ -123,29 +113,34 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
         longitude = loc.coords.longitude;
       }
 
-      await setDoc(
-        doc(db, "users", uid),
-        {
-          uid,
-          ...profile,
-          latitude,
-          longitude,
-
-          // 🔥 ensure fields always exist
-          warnings: 0,
-          banned: false,
-        },
-        { merge: true },
-      );
-
-      setUser((prev) => ({
-        ...(prev || { uid }),
+      const updatedData = {
+        uid,
+        email: auth.currentUser.email || "",
         ...profile,
         latitude,
         longitude,
-      }));
+        warnings: 0,
+        banned: false,
+      };
+
+      await setDoc(doc(db, "users", uid), updatedData, { merge: true });
+
+      setUser((prev) => {
+        const merged = { ...(prev || {}), ...updatedData } as UserProfileState;
+        const complete = 
+          !!merged.name && 
+          Array.isArray(merged.photos) && 
+          merged.photos.length >= 1;
+
+        return {
+          ...merged,
+          isProfileComplete: complete,
+        };
+      });
+
     } catch (error) {
       console.log("SAVE PROFILE ERROR:", error);
+      throw error;
     }
   };
 
