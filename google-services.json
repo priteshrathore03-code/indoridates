@@ -1,0 +1,92 @@
+{
+  "project_info": {
+    "project_number": "860588660053",
+    "project_id": "indoridates",
+    "storage_bucket": "indoridates.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:860588660053:android:2d4b3724d02f3cf08c4bdc",
+        "android_client_info": {
+          "package_name": "com.indoridates.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "860588660053-4k5gj3b9gv9imcskhmeig6e1brk7au42.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.indoridates.app",
+            "certificate_hash": "ea05b0a7e40efd68e851eac443248907d0777940"
+          }
+        },
+        {
+          "client_id": "860588660053-d2rlbi3speugkp1so0l1juvihpgd47pc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.indoridates.app",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMY6AWM6ZPZcVNjs1AHqXcOTUQR3PV2rM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:860588660053:android:df275f852e6fa2e08c4bdc",
+        "android_client_info": {
+          "package_name": "com.indoridates.app1"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "860588660053-noa6dhjmc43e0gg7c05p2o7aalkg9q1s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.indoridates.app1",
+            "certificate_hash": "153a3551dac519ebe432cf467ac3a73ff7d19033"
+          }
+        },
+        {
+          "client_id": "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMY6AWM6ZPZcVNjs1AHqXcOTUQR3PV2rM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
