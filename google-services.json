@@ -86,6 +86,51 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:860588660053:android:0e19580ad16b903a8c4bdc",
+        "android_client_info": {
+          "package_name": "com.indoridates.app2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "860588660053-21mn2bl7e9k08qdf7ke00eg9hcn85mup.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.indoridates.app2",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "860588660053-i4pdip3a5r2fr4dgb4uubb1gfes671tr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.indoridates.app2",
+            "certificate_hash": "62ce33dbda567bb33eb2ebfcac20d206a96a1d18"
+          }
+        },
+        {
+          "client_id": "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMY6AWM6ZPZcVNjs1AHqXcOTUQR3PV2rM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

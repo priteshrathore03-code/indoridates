@@ -211,9 +211,15 @@ list.forEach((user) => {
             );
 
             setMatchPair({
-              currentUser: target,
-              matchedUser: target,
-            });
+  currentUser: {
+    id: myUid,
+    name: myProfile?.name || "You",
+    age: myProfile?.age || 18,
+    bio: myProfile?.bio || "",
+    media: myProfile?.photos || [],
+  },
+  matchedUser: target,
+});
           }
         }
 

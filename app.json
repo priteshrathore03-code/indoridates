@@ -16,10 +16,10 @@
       "expo-web-browser"
     ],
     "android": {
-      "package": "com.indoridates.app",
-      "versionCode": 2,
-      "googleServicesFile": "./google-services.json"
-    },
+  "package": "com.indoridates.app2",
+  "versionCode": 3,
+  "googleServicesFile": "./google-services.json"
+},
     "ios": {
       "bundleIdentifier": "com.indoridates.app",
       "buildNumber": "2",

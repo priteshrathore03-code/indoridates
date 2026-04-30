@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
   cancel: { textAlign: "center", color: "#888", marginTop: 15, fontSize: 16 },
   createBtnContainer: {
     position: "absolute",
-    bottom: 30,
+    top: "50%",
     alignSelf: "center",
     width: "80%",
   },
