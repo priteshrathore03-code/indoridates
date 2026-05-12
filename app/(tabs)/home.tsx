@@ -127,13 +127,13 @@ export default function Home() {
           gender: data.gender,
         });
       });
-list.forEach((user) => {
-  user.media.forEach((url) => {
-    if (url && url.startsWith("http")) {
-      Image.prefetch(url);
-    }
-  });
-});
+      list.forEach((user) => {
+        user.media.forEach((url) => {
+          if (url && url.startsWith("http")) {
+            Image.prefetch(url);
+          }
+        });
+      });
       setUsers(list);
     } catch (error) {
       console.error("Error loading users:", error);
@@ -211,15 +211,15 @@ list.forEach((user) => {
             );
 
             setMatchPair({
-  currentUser: {
-    id: myUid,
-    name: myProfile?.name || "You",
-    age: myProfile?.age || 18,
-    bio: myProfile?.bio || "",
-    media: myProfile?.photos || [],
-  },
-  matchedUser: target,
-});
+              currentUser: {
+                id: myUid,
+                name: myProfile?.name || "You",
+                age: myProfile?.age || 18,
+                bio: myProfile?.bio || "",
+                media: myProfile?.photos || [],
+              },
+              matchedUser: target,
+            });
           }
         }
 

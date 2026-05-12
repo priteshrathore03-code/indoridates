@@ -132,11 +132,15 @@ SwipeCard.displayName = "SwipeCard";
 
 const styles = StyleSheet.create({
   card: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 0,
+    width: "94%",
+    height: "92%",
+    borderRadius: 30,
     overflow: "hidden",
     backgroundColor: "#1a1a1a",
+    alignSelf: "center",
+    marginTop: 18,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.08)",
   },
 
   imageContainer: {
@@ -162,9 +166,9 @@ const styles = StyleSheet.create({
 
   progressContainer: {
     position: "absolute",
-    top: 40,
-    left: 8,
-    right: 8,
+    top: 20,
+    left: 16,
+    right: 16,
     flexDirection: "row",
     gap: 4,
   },
@@ -179,26 +183,30 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 0,
     width: "100%",
-    padding: 20,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 20,
+    paddingTop: 35,
+    paddingBottom: 22,
+
+    backgroundColor: "rgba(0,0,0,0.38)",
   },
 
   name: {
     color: "#fff",
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: "bold",
+    marginBottom: 10,
   },
 
   bio: {
-    color: "#ddd",
-    fontSize: 14,
-    marginTop: 4,
+    color: "rgba(255,255,255,0.9)",
+    marginBottom: 8,
+    fontSize: 15,
+    lineHeight: 20,
   },
-
   distance: {
     color: "#fff",
-    marginTop: 6,
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
 

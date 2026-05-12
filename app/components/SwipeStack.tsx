@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   actionsPanel: {
     position: "absolute",
     right: 10,
-    bottom: 100,
+    bottom: 120,
     alignItems: "center",
     gap: 10,
   },

@@ -12,8 +12,10 @@ import { useRouter } from "expo-router";
 
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   query,
   where,
@@ -41,9 +43,31 @@ export default function ChatTab() {
 
     const unsubLikes = onSnapshot(qLikes, async (snap) => {
       const arr: any[] = [];
+      const uniqueUsers = new Set();
 
       for (const d of snap.docs) {
         const data = d.data();
+        if (uniqueUsers.has(data.from)) {
+          continue;
+        }
+
+        uniqueUsers.add(data.from);
+
+        const roomQuery = query(
+          collection(db, "chatRooms"),
+          where("users", "array-contains", myUid),
+        );
+
+        const roomSnap = await getDocs(roomQuery);
+
+        const alreadyMatched = roomSnap.docs.some((room) => {
+          const users = room.data().users || [];
+          return users.includes(data.from);
+        });
+
+        if (alreadyMatched) {
+          continue;
+        }
 
         const userDoc = await getDoc(doc(db, "users", data.from));
 
@@ -52,6 +76,7 @@ export default function ChatTab() {
 
           arr.push({
             id: data.from,
+            likeDocId: d.id,
             name: u.name,
             age: u.age,
             bio: u.bio,
@@ -105,6 +130,14 @@ export default function ChatTab() {
     };
   }, []);
 
+  const handleDeleteLike = async (likeDocId: string) => {
+    try {
+      await deleteDoc(doc(db, "likes", likeDocId));
+    } catch (e) {
+      console.log("Delete Like Error:", e);
+    }
+  };
+
   return (
     <IndoreBackground>
       <FadeWrapper>
@@ -142,6 +175,13 @@ export default function ChatTab() {
                   onPress={() => router.push(`/home?focusUser=${u.id}`)}
                 >
                   <Text style={styles.profileText}>View Profile</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => handleDeleteLike(u.likeDocId)}
+                >
+                  <Text style={styles.deleteText}>Remove</Text>
                 </TouchableOpacity>
               </View>
 
@@ -262,5 +302,19 @@ const styles = StyleSheet.create({
   profileText: {
     color: "white",
     fontSize: 12,
+  },
+  deleteBtn: {
+    marginTop: 6,
+    backgroundColor: "#ff4d6d",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    alignSelf: "flex-start",
+  },
+
+  deleteText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

@@ -28,7 +28,7 @@ export default function ProfilePhotos() {
   const [photos, setPhotos] = useState<string[]>(
     user?.photos && user.photos.length > 0
       ? [...user.photos]
-      : ["", "", "", "", ""]
+      : ["", "", "", "", ""],
   );
   const [video, setVideo] = useState<string | null>(user?.video || null);
   const [loading, setLoading] = useState(false);
@@ -68,7 +68,6 @@ export default function ProfilePhotos() {
     if (!result.canceled) setVideo(result.assets[0].uri);
   };
 
-  
   const storage = getStorage();
 
   const uploadToFirebase = async (uri: string, path: string) => {
@@ -115,10 +114,7 @@ export default function ProfilePhotos() {
         const check = await checkImageSafety(url);
 
         if (!check?.ok) {
-          Alert.alert(
-            "Photo Reject ❌",
-            "Invalid photo. Dubara try karo."
-          );
+          Alert.alert("Photo Reject ❌", "Invalid photo. Dubara try karo.");
           setLoading(false);
           return;
         }
@@ -134,14 +130,15 @@ export default function ProfilePhotos() {
         finalVideoURL = await uploadToFirebase(video, videoPath);
       }
 
-     await saveProfile({
-  photos: finalPhotoURLs,
-  video: finalVideoURL,
-});
+      await saveProfile({
+        photos: finalPhotoURLs,
+        video: finalVideoURL,
+        isProfileComplete: true,
+      });
 
-await new Promise(res => setTimeout(res, 1500));
+      await new Promise((res) => setTimeout(res, 1500));
 
-router.replace("/(tabs)/home");
+      router.replace("/(tabs)/home");
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "Kuch galti hui, dobara try karein.");
@@ -232,7 +229,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: "center",
   },
-  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
   photoBox: {
     width: "31%",
     height: 110,

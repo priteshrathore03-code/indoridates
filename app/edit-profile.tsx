@@ -2,6 +2,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   ScrollView,
@@ -27,6 +28,7 @@ export default function EditProfile() {
   const [age, setAge] = useState("");
   const [bio, setBio] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -98,9 +100,10 @@ export default function EditProfile() {
       bio: bio.trim(),
       photos,
     };
-
+    setLoading(true);
     await saveProfile(updatedProfile);
     router.back();
+    setLoading(false);
   };
 
   return (
@@ -145,8 +148,16 @@ export default function EditProfile() {
             <TouchableOpacity style={styles.btn} onPress={pickImage}>
               <Text style={styles.btnText}>Add Photo</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.btnText}>Save</Text>
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSave}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.saveText}>Save</Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -156,6 +167,11 @@ export default function EditProfile() {
 }
 
 const styles = StyleSheet.create({
+  saveText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
   container: {
     flexGrow: 1,
     justifyContent: "center",

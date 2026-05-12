@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { useRouter } from "expo-router";
 import {
@@ -16,6 +17,7 @@ import {
   ImageBackground,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -36,10 +38,6 @@ export default function Login() {
           "860588660053-p5rk7kth3hbavua92d5bog1pa87sdp7h.apps.googleusercontent.com",
         // For iOS, the webClientId above is used for authentication
         // Ensure GoogleService-Info.plist is added to Xcode for native iOS features
-        offlineAccess: true,
-        hostedDomain: "",
-        forceCodeForRefreshToken: true,
-        accountName: "",
       });
     }
   }, []);
@@ -48,6 +46,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
@@ -81,18 +80,25 @@ export default function Login() {
         console.log("Using web-based Google authentication");
         const provider = new GoogleAuthProvider();
         userCredential = await signInWithPopup(auth, provider);
-        console.log("Web Google Sign-In successful:", userCredential.user.email);
+        console.log(
+          "Web Google Sign-In successful:",
+          userCredential.user.email,
+        );
       } else {
         // Native (React Native) Google Sign-In
         console.log("Using native Google authentication");
-        
+
         // Check if Google Play Services are available
         await GoogleSignin.hasPlayServices();
+
         console.log("Google Play Services available");
 
         // Sign in with Google
         const userInfo = await GoogleSignin.signIn();
-        console.log("Native Google Sign-In successful:", userInfo.data?.user?.email);
+        console.log(
+          "Native Google Sign-In successful:",
+          userInfo.data?.user?.email,
+        );
 
         // Get ID token for Firebase authentication
         const idToken = userInfo.data?.idToken;
@@ -106,7 +112,10 @@ export default function Login() {
 
         // Sign in with Firebase using Google credential
         userCredential = await signInWithCredential(auth, credential);
-        console.log("Native Firebase authentication successful:", userCredential.user.email);
+        console.log(
+          "Native Firebase authentication successful:",
+          userCredential.user.email,
+        );
       }
 
       // Register for push notifications
@@ -117,7 +126,10 @@ export default function Login() {
       router.replace("/");
     } catch (error: any) {
       console.error("Google Login Error:", error.message);
-      Alert.alert("Google Sign-In Error", error.message || "Failed to sign in with Google. Please try again.");
+      Alert.alert(
+        "Google Sign-In Error",
+        error.message || "Failed to sign in with Google. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -157,12 +169,12 @@ export default function Login() {
         );
 
         // if (!userCredential.user.emailVerified) {
-//   Alert.alert(
-//     "Email Not Verified",
-//     "Please verify your email before login.",
-//   );
-//   return;
-// }
+        //   Alert.alert(
+        //     "Email Not Verified",
+        //     "Please verify your email before login.",
+        //   );
+        //   return;
+        // }
 
         await registerForPushNotifications(userCredential.user.uid);
 
@@ -201,14 +213,24 @@ export default function Login() {
               autoCapitalize="none"
             />
 
-            <TextInput
-              placeholder="Password"
-              placeholderTextColor="#ccc"
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+            <View style={styles.passwordContainer}>
+              <TextInput
+                placeholder="Password"
+                placeholderTextColor="#ccc"
+                style={styles.passwordInput}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+              />
+
+              <Pressable onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={22}
+                  color="#fff"
+                />
+              </Pressable>
+            </View>
 
             <TouchableOpacity
               style={styles.button}
@@ -292,6 +314,22 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.2)",
+    color: "white",
+  },
+  passwordContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: 14,
+    marginBottom: 15,
+  },
+
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 14,
     color: "white",
   },
   button: {

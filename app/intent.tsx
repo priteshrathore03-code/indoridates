@@ -1,6 +1,12 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useUserProfile } from "../data/userProfile";
 import FadeWrapper from "./components/FadeWrapper";
 import IndoreBackground from "./components/IndoreBackground";
@@ -9,18 +15,27 @@ export default function Intent() {
   const router = useRouter();
   const { user, saveProfile } = useUserProfile();
   const [selected, setSelected] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   if (!user) return null;
 
   const handleNext = async () => {
     if (!selected) return;
 
-    await saveProfile({
-      ...user,
-      bio: selected,
-    });
+    try {
+      setLoading(true);
 
-    router.push("/profile-photos");
+      await saveProfile({
+        ...user,
+        bio: selected,
+      });
+
+      router.push("/profile-photos");
+    } catch (e) {
+      console.log(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -58,8 +73,16 @@ export default function Intent() {
               <Text style={styles.optionText}>✨ Just Exploring</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
-              <Text style={styles.nextText}>Next</Text>
+            <TouchableOpacity
+              style={styles.nextBtn}
+              onPress={handleNext}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.nextText}>Next</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

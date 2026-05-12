@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   StyleSheet,
   Text,
   TextInput,
@@ -17,19 +18,32 @@ export default function ProfileMore() {
 
   const [age, setAge] = useState("");
   const [gender, setGender] = useState<"male" | "female" | null>(null);
+  const [loading, setLoading] = useState(false);
 
   if (!user) return null;
 
   const handleNext = async () => {
     if (!age || !gender) return;
+    if (Number(age) < 18) {
+      alert("Age must be 18+");
+      return;
+    }
 
-    await saveProfile({
-      ...user,
-      age: Number(age),
-      gender,
-    });
+    try {
+      setLoading(true);
 
-    router.push("/intent"); // WHY ARE YOU HERE PAGE
+      await saveProfile({
+        ...user,
+        age: Number(age),
+        gender,
+      });
+
+      router.push("/intent");
+    } catch (e) {
+      console.log(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -60,8 +74,16 @@ export default function ProfileMore() {
               <Text style={styles.genderText}>Female</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
-              <Text style={styles.nextText}>Next</Text>
+            <TouchableOpacity
+              style={styles.nextBtn}
+              onPress={handleNext}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.nextText}>Next</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

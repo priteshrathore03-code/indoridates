@@ -1,10 +1,9 @@
-import * as Linking from "expo-linking";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
-import { useEffect, useState } from "react";
-
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import {
   Image,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,153 +11,154 @@ import {
   View,
 } from "react-native";
 
-import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-
 import { useUserProfile } from "../../data/userProfile";
-import { db } from "../../firebaseConfig";
-
 import FadeWrapper from "../components/FadeWrapper";
 import IndoreBackground from "../components/IndoreBackground";
 
 export default function Profile() {
   const router = useRouter();
-  const params = useLocalSearchParams();
   const { user, logout } = useUserProfile();
 
-  const [viewUser, setViewUser] = useState<any>(null);
+  if (!user) return null;
 
-  const isOtherProfile = params.uid && user && params.uid !== user.uid;
-
-  useEffect(() => {
-    const loadProfile = async () => {
-      if (isOtherProfile && params.uid) {
-        const snap = await getDoc(doc(db, "users", String(params.uid)));
-        if (snap.exists()) setViewUser(snap.data());
-      } else {
-        setViewUser(user);
-      }
-    };
-
-    loadProfile();
-  }, [params.uid, user]);
-
-  if (!viewUser) return null;
+  const profileImage =
+    user?.photos?.[0] ||
+    "https://images.unsplash.com/photo-1494790108377-be9c29b29330";
 
   const handleLogout = async () => {
     await logout();
     router.replace("/welcome");
   };
-
-  const handleContact = () => {
-    Linking.openURL(
-      "mailto:indoridates@gmail.com?subject=IndoriDates Support&body=Hi, I need help..."
-    );
+  const handleSupport = async () => {
+    try {
+      await Linking.openURL(
+        "mailto:support@indoridates.com?subject=IndoriDates Support",
+      );
+    } catch (e) {
+      console.log(e);
+    }
   };
 
   return (
     <IndoreBackground>
       <FadeWrapper>
-        <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* HERO CARD */}
+          <LinearGradient
+            colors={["rgba(255,77,109,0.25)", "rgba(255,255,255,0.08)"]}
+            style={styles.heroCard}
+          >
+            <Image source={{ uri: profileImage }} style={styles.profileImage} />
 
-          <View style={styles.card}>
+            <View style={styles.infoSection}>
+              <Text style={styles.name}>
+                {user?.name || "Indori User"},{" "}
+                <Text style={styles.age}>{user?.age || 18}</Text>
+              </Text>
 
-            {isOtherProfile && (
-              <TouchableOpacity
-                onPress={() => {
-                  if (router.canGoBack()) router.back();
-                  else router.replace("/(tabs)/home");
-                }}
-              >
-                <Text style={styles.backText}>← Back</Text>
-              </TouchableOpacity>
-            )}
+              <View style={styles.badgeRow}>
+                <View style={styles.genderBadge}>
+                  <Ionicons
+                    name={user?.gender === "female" ? "female" : "male"}
+                    size={15}
+                    color="#fff"
+                  />
 
-            <Text style={styles.title}>
-              {isOtherProfile ? "User Profile" : "My Profile"}
-            </Text>
+                  <Text style={styles.badgeText}>{user?.gender || "User"}</Text>
+                </View>
 
-            {/* PHOTOS */}
-            {viewUser.photos?.filter((p:string)=>p && p.trim() !== "").length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {viewUser.photos
-                  .filter((p:string)=>p && p.trim() !== "")
-                  .map((uri:string,index:number)=>(
-                    <Image key={index} source={{uri}} style={styles.photo}/>
-                  ))}
-              </ScrollView>
-            )}
+                <View style={styles.locationBadge}>
+                  <Ionicons name="location" size={14} color="#fff" />
 
-            {/* INFO */}
-            {viewUser.name && (
-              <View style={styles.infoRow}>
-                <Feather name="user" size={16} color="#aaa" />
-                <Text style={styles.value}>{viewUser.name}</Text>
+                  <Text style={styles.badgeText}>Indore</Text>
+                </View>
               </View>
-            )}
+            </View>
+          </LinearGradient>
 
-            {viewUser.age && (
-              <View style={styles.infoRow}>
-                <Feather name="calendar" size={16} color="#aaa" />
-                <Text style={styles.value}>{viewUser.age}</Text>
-              </View>
-            )}
+          {/* ABOUT */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About Me</Text>
 
-            {viewUser.gender && (
-              <View style={styles.infoRow}>
-                <Feather name="heart" size={16} color="#aaa" />
-                <Text style={styles.value}>{viewUser.gender}</Text>
-              </View>
-            )}
-
-            {viewUser.bio && (
-              <View style={styles.bioBox}>
-                <Text style={styles.bio}>{viewUser.bio}</Text>
-              </View>
-            )}
-
-            {/* MY PROFILE ACTIONS */}
-            {!isOtherProfile && (
-              <>
-
-                <TouchableOpacity
-                  onPress={() => router.push("/edit-profile")}
-                >
-                  <LinearGradient
-                    colors={["#ffb347","#ff416c","#ff2d95"]}
-                    start={{x:0,y:0}}
-                    end={{x:1,y:0}}
-                    style={styles.button}
-                  >
-                    <Text style={styles.btnText}>Edit Profile</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={handleLogout}>
-                  <LinearGradient
-                    colors={["#ff4d6d","#ff2d55"]}
-                    style={styles.button}
-                  >
-                    <Text style={styles.btnText}>Logout</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={handleContact}>
-                  <View style={styles.supportBtn}>
-                    <Text style={styles.btnText}>📩 Contact Support</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <Text style={styles.supportText}>
-                  Need help? Contact us anytime.  
-                  We usually respond within 24-48 hours.
-                </Text>
-
-              </>
-            )}
-
+            <View style={styles.glassCard}>
+              <Text style={styles.bioText}>
+                {user?.bio || "No bio added yet"}
+              </Text>
+            </View>
           </View>
 
+          {/* PHOTOS */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Photos</Text>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {(user?.photos || []).map((photo: string, index: number) => (
+                <Image
+                  key={index}
+                  source={{ uri: photo }}
+                  style={styles.galleryImage}
+                />
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* ACTION BUTTONS */}
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => router.push("/edit-profile")}
+            >
+              <View style={styles.actionLeft}>
+                <Feather name="edit-2" size={20} color="#fff" />
+
+                <Text style={styles.actionText}>Edit Profile</Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={20} color="#aaa" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => router.push("/todo")}
+            >
+              <View style={styles.actionLeft}>
+                <Ionicons name="calendar-outline" size={20} color="#fff" />
+
+                <Text style={styles.actionText}>My Plans</Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={20} color="#aaa" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionBtn} onPress={handleSupport}>
+              <View style={styles.actionLeft}>
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={20}
+                  color="#fff"
+                />
+
+                <Text style={styles.actionText}>Contact Support</Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={20} color="#aaa" />
+            </TouchableOpacity>
+            <Text style={styles.supportText}>
+              Need help? Contact us anytime. We usually respond within 24-48
+              hours.
+            </Text>
+
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={20} color="#fff" />
+
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ height: 120 }} />
         </ScrollView>
       </FadeWrapper>
     </IndoreBackground>
@@ -166,87 +166,150 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
+  supportText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 12,
+    marginTop: -6,
+    marginBottom: 14,
+    marginLeft: 8,
+  },
+  container: {
+    padding: 20,
+    paddingTop: 70,
+  },
 
-container:{
-flexGrow:1,
-justifyContent:"center",
-padding:20
-},
+  heroCard: {
+    borderRadius: 28,
+    padding: 25,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
 
-card:{
-backgroundColor:"rgba(255,255,255,0.12)",
-borderRadius:25,
-padding:20
-},
+  profileImage: {
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    borderWidth: 4,
+    borderColor: "#ff4d6d",
+  },
 
-backText:{
-color:"white",
-marginBottom:10
-},
+  infoSection: {
+    alignItems: "center",
+    marginTop: 18,
+  },
 
-title:{
-fontSize:24,
-fontWeight:"bold",
-color:"white",
-textAlign:"center",
-marginBottom:20
-},
+  name: {
+    color: "#fff",
+    fontSize: 28,
+    fontWeight: "bold",
+  },
 
-photo:{
-width:120,
-height:120,
-borderRadius:15,
-marginRight:10
-},
+  age: {
+    color: "#ffb3c1",
+  },
 
-infoRow:{
-flexDirection:"row",
-alignItems:"center",
-marginTop:10,
-gap:8
-},
+  badgeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
 
-value:{
-color:"white",
-fontSize:16
-},
+  genderBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
 
-bioBox:{
-backgroundColor:"rgba(255,255,255,0.1)",
-borderRadius:15,
-padding:12,
-marginTop:15
-},
+  locationBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
 
-bio:{
-color:"#ddd"
-},
+  badgeText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
 
-button:{
-padding:16,
-borderRadius:30,
-alignItems:"center",
-marginTop:15
-},
+  section: {
+    marginTop: 28,
+  },
 
-btnText:{
-color:"white",
-fontWeight:"bold"
-},
+  sectionTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 14,
+  },
 
-supportBtn:{
-backgroundColor:"#444",
-padding:16,
-borderRadius:30,
-alignItems:"center",
-marginTop:15
-},
+  glassCard: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
 
-supportText:{
-color:"#ccc",
-fontSize:12,
-textAlign:"center",
-marginTop:10
-}
+  bioText: {
+    color: "#ddd",
+    lineHeight: 24,
+    fontSize: 15,
+  },
 
+  galleryImage: {
+    width: 120,
+    height: 170,
+    borderRadius: 20,
+    marginRight: 14,
+  },
+
+  actionBtn: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 20,
+    padding: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  actionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  actionText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  logoutBtn: {
+    backgroundColor: "#ff4d6d",
+    borderRadius: 20,
+    padding: 18,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 8,
+  },
+
+  logoutText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
 });

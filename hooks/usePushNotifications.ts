@@ -1,31 +1,40 @@
 import * as Notifications from "expo-notifications";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../firebaseConfig";
+import { useEffect } from "react";
 
-export const registerForPushNotifications = async (userId: string) => {
-  try {
-    const { status: existingStatus } =
-      await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
+import { auth } from "../firebaseConfig";
+import { registerForPushNotifications } from "../services/notificationService";
 
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+export default function usePushNotifications() {
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+
+    if (uid) {
+      registerForPushNotifications(uid);
     }
 
-    if (finalStatus !== "granted") return;
+    const receivedListener = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        console.log("Notification Received:", notification);
+      },
+    );
 
-    const tokenData = await Notifications.getExpoPushTokenAsync();
-    const token = tokenData.data;
-
-    if (token && userId) {
-      const userRef = doc(db, "users", userId);
-      await updateDoc(userRef, {
-        pushToken: token,
+    const responseListener =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        console.log("Notification Clicked:", response);
       });
-      console.log("Token saved successfully!");
-    }
-  } catch (error) {
-    console.error("Token error:", error);
-  }
-};
+
+    return () => {
+      receivedListener.remove();
+      responseListener.remove();
+    };
+  }, []);
+}
