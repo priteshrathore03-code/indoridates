@@ -1,5 +1,5 @@
 import { ResizeMode, Video } from "expo-av";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -20,7 +20,7 @@ interface SwipeCardProps {
   style?: any;
 }
 
-const SwipeCard = React.memo(
+const SwipeCard = 
   ({
     user,
     mediaIndex,
@@ -39,6 +39,9 @@ const SwipeCard = React.memo(
     );
 
     const [loaded, setLoaded] = useState(false);
+    useEffect(() => {
+      setLoaded(false);
+    }, [currentMedia]);
 
     return (
       <Animated.View style={[styles.card, style]}>
@@ -49,7 +52,7 @@ const SwipeCard = React.memo(
               source={{ uri: currentMedia }}
               style={StyleSheet.absoluteFillObject}
               resizeMode={ResizeMode.COVER}
-              shouldPlay
+              shouldPlay={false}
               isLooping
             />
           ) : (
@@ -68,6 +71,7 @@ const SwipeCard = React.memo(
                 style={StyleSheet.absoluteFillObject}
                 resizeMode="cover"
                 onLoad={() => setLoaded(true)}
+                fadeDuration={0}
               />
             </View>
           )}
@@ -125,10 +129,8 @@ const SwipeCard = React.memo(
         </TouchableOpacity>
       </Animated.View>
     );
-  },
-);
+  };
 
-SwipeCard.displayName = "SwipeCard";
 
 const styles = StyleSheet.create({
   card: {
@@ -147,7 +149,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#000",
+    backgroundColor: "#111",
   },
 
   loader: {

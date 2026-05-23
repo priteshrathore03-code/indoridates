@@ -29,7 +29,7 @@ export default function Welcome() {
           <TouchableOpacity
             style={styles.button}
             activeOpacity={0.8}
-            onPress={() => router.push("/login")}
+            onPress={() => router.replace("/login")}
           >
             <Text style={styles.buttonText}>GET STARTED</Text>
           </TouchableOpacity>

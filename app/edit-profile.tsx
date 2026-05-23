@@ -1,3 +1,4 @@
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -56,8 +57,12 @@ export default function EditProfile() {
 
     try {
       const uri = result.assets[0].uri;
+      const compressed = await ImageManipulator.manipulateAsync(uri, [], {
+        compress: 0.4,
+        format: ImageManipulator.SaveFormat.JPEG,
+      });
 
-      const response = await fetch(uri);
+      const response = await fetch(compressed.uri);
       const blob = await response.blob();
 
       const storageRef = ref(storage, `users/${user.uid}/${Date.now()}.jpg`);

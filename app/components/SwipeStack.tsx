@@ -1,9 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Animated,
   Dimensions,
-  PanResponder,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -55,42 +53,20 @@ const SwipeStack: React.FC<SwipeStackProps> = ({
     setMediaIndex(0);
   }, [currentUser]);
 
-  const pan = useRef(new Animated.ValueXY()).current;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: () => true,
-
-      onPanResponderMove: (_, gesture) => {
-        pan.setValue({ x: gesture.dx, y: gesture.dy });
-      },
-
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx > 120) {
-          onSwipe("like");
-        } else if (gesture.dx < -120) {
-          onSwipe("dislike");
-        } else if (gesture.dy < -150) {
-          onSwipe("superlike");
-        }
-
-        pan.setValue({ x: 0, y: 0 });
-      },
-    }),
-  ).current;
+  
 
   return (
     <View style={styles.container}>
       {/* Profile Card */}
-      <Animated.View {...panResponder.panHandlers} style={[styles.cardWrapper]}>
-        <SwipeCard
-          user={currentUser}
-          mediaIndex={mediaIndex} // 🔥 FIXED
-          onMediaPrev={handlePrev} // 🔥 FIXED
-          onMediaNext={handleNext} // 🔥 FIXED
-          onPress={onCardPress}
-        />
-      </Animated.View>
+      <View key={currentUser.id} style={styles.cardWrapper}>
+  <SwipeCard
+    user={currentUser}
+    mediaIndex={mediaIndex}
+    onMediaPrev={handlePrev}
+    onMediaNext={handleNext}
+    onPress={onCardPress}
+  />
+</View>
 
       {/* Right Action Panel */}
       <View style={styles.actionsPanel}>

@@ -1,5 +1,5 @@
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import {
   createContext,
   ReactNode,
@@ -57,35 +57,38 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         const userRef = doc(db, "users", firebaseUser.uid);
-        const snap = await getDoc(userRef);
 
-        if (!snap.exists()) {
+        const unsubscribeSnapshot = onSnapshot(userRef, (snap) => {
+          if (!snap.exists()) {
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || "",
+              isProfileComplete: false,
+            });
+
+            setLoading(false);
+            return;
+          }
+
+          const data = snap.data();
+
+          const isComplete = !!(
+            data.name &&
+            Array.isArray(data.photos) &&
+            data.photos.length >= 1
+          );
+
           setUser({
             uid: firebaseUser.uid,
-            email: firebaseUser.email || "",
-            isProfileComplete: false,
-          });
+            email: firebaseUser.email || data.email || "",
+            ...data,
+            isProfileComplete: isComplete,
+          } as UserProfileState);
+
           setLoading(false);
-          return;
-        }
+        });
 
-        const data = snap.data();
-
-        if (data.banned) {
-          alert("Account blocked 🚫");
-          await signOut(auth);
-          return;
-        }
-
-        const isComplete = !!(data.name && Array.isArray(data.photos) && data.photos.length >= 1);
-
-        setUser({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || data.email || "",
-          ...data,
-          isProfileComplete: isComplete,
-        } as UserProfileState);
-
+        return unsubscribeSnapshot;
       } catch (e) {
         console.log("USER FETCH ERROR:", e);
       } finally {
@@ -127,9 +130,9 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
 
       setUser((prev) => {
         const merged = { ...(prev || {}), ...updatedData } as UserProfileState;
-        const complete = 
-          !!merged.name && 
-          Array.isArray(merged.photos) && 
+        const complete =
+          !!merged.name &&
+          Array.isArray(merged.photos) &&
           merged.photos.length >= 1;
 
         return {
@@ -137,7 +140,6 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
           isProfileComplete: complete,
         };
       });
-
     } catch (error) {
       console.log("SAVE PROFILE ERROR:", error);
       throw error;

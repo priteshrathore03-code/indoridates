@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -34,6 +35,7 @@ export default function ChatTab() {
 
   const [likes, setLikes] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
     const myUid = auth.currentUser?.uid;
@@ -47,6 +49,20 @@ export default function ChatTab() {
 
       for (const d of snap.docs) {
         const data = d.data();
+        const createdAt = data.createdAt;
+
+        // 🔥 old likes jisme createdAt nahi hai unko skip karo
+        if (!createdAt) {
+          continue;
+        }
+
+        // 🔥 24 hours old likes auto remove
+        const isExpired = Date.now() - createdAt > 24 * 60 * 60 * 1000;
+
+        if (isExpired) {
+          await deleteDoc(doc(db, "likes", d.id));
+          continue;
+        }
         if (uniqueUsers.has(data.from)) {
           continue;
         }
@@ -64,8 +80,9 @@ export default function ChatTab() {
           const users = room.data().users || [];
           return users.includes(data.from);
         });
-
+        console.log("ALREADY MATCHED:", alreadyMatched, data.from);
         if (alreadyMatched) {
+          setLikes((prev) => prev.filter((x) => x.id !== data.from));
           continue;
         }
 
@@ -132,9 +149,17 @@ export default function ChatTab() {
 
   const handleDeleteLike = async (likeDocId: string) => {
     try {
+      setRemovingId(likeDocId);
+
+      // 🔥 Firebase delete
       await deleteDoc(doc(db, "likes", likeDocId));
+
+      // 🔥 Delete hone ke baad UI remove
+      setLikes((prev) => prev.filter((item) => item.likeDocId !== likeDocId));
     } catch (e) {
       console.log("Delete Like Error:", e);
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -142,6 +167,35 @@ export default function ChatTab() {
     <IndoreBackground>
       <FadeWrapper>
         <ScrollView style={styles.container}>
+          {/* Matches Section */}
+          <Text style={[styles.title, { marginTop: 25 }]}>💬 Matches</Text>
+
+          {chats.map((c) => (
+            <LinearGradient
+              key={c.id}
+              colors={["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]}
+              style={styles.card}
+            >
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => router.push("/chat/" + c.id)}
+              >
+                <Image source={{ uri: c.photo }} style={styles.photo} />
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>{c.name}</Text>
+
+                  <Text style={styles.message}>{c.message}</Text>
+                </View>
+
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={styles.time}>{c.time}</Text>
+                  <Feather name="heart" size={18} color="#ff2d95" />
+                </View>
+              </TouchableOpacity>
+            </LinearGradient>
+          ))}
+
           {/* Likes Section */}
           <View style={styles.sectionHeader}>
             <Text style={styles.title}>💖 Likes You</Text>
@@ -179,42 +233,18 @@ export default function ChatTab() {
 
                 <TouchableOpacity
                   style={styles.deleteBtn}
+                  disabled={removingId === u.likeDocId}
                   onPress={() => handleDeleteLike(u.likeDocId)}
                 >
-                  <Text style={styles.deleteText}>Remove</Text>
+                  {removingId === u.likeDocId ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.deleteText}>Remove</Text>
+                  )}
                 </TouchableOpacity>
               </View>
 
               <Feather name="heart" size={20} color="#ff2d95" />
-            </LinearGradient>
-          ))}
-
-          {/* Matches Section */}
-          <Text style={[styles.title, { marginTop: 25 }]}>💬 Matches</Text>
-
-          {chats.map((c) => (
-            <LinearGradient
-              key={c.id}
-              colors={["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]}
-              style={styles.card}
-            >
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => router.push("/chat/" + c.id)}
-              >
-                <Image source={{ uri: c.photo }} style={styles.photo} />
-
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>{c.name}</Text>
-
-                  <Text style={styles.message}>{c.message}</Text>
-                </View>
-
-                <View style={{ alignItems: "flex-end" }}>
-                  <Text style={styles.time}>{c.time}</Text>
-                  <Feather name="heart" size={18} color="#ff2d95" />
-                </View>
-              </TouchableOpacity>
             </LinearGradient>
           ))}
         </ScrollView>
@@ -227,6 +257,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+    paddingTop: 55,
   },
 
   sectionHeader: {

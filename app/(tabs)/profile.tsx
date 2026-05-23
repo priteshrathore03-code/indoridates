@@ -1,9 +1,11 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
   Image,
   Linking,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,9 +23,15 @@ export default function Profile() {
 
   if (!user) return null;
 
-  const profileImage =
-    user?.photos?.[0] ||
-    "https://images.unsplash.com/photo-1494790108377-be9c29b29330";
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerImage, setViewerImage] = useState("");
+
+  const profileImage = user.photos?.[0] || "";
+
+  const hasProfileImage =
+    profileImage &&
+    typeof profileImage === "string" &&
+    profileImage.trim().length > 0;
 
   const handleLogout = async () => {
     await logout();
@@ -51,12 +59,23 @@ export default function Profile() {
             colors={["rgba(255,77,109,0.25)", "rgba(255,255,255,0.08)"]}
             style={styles.heroCard}
           >
-            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+            {hasProfileImage ? (
+              <Image
+                key={profileImage}
+                source={{
+                  uri: `${profileImage}?t=${Date.now()}`,
+                }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <View style={styles.emptyProfile}>
+                <Ionicons name="person" size={50} color="#fff" />
+              </View>
+            )}
 
             <View style={styles.infoSection}>
               <Text style={styles.name}>
-                {user?.name || "Indori User"},{" "}
-                <Text style={styles.age}>{user?.age || 18}</Text>
+                {user.name}, <Text style={styles.age}>{user.age}</Text>
               </Text>
 
               <View style={styles.badgeRow}>
@@ -67,7 +86,7 @@ export default function Profile() {
                     color="#fff"
                   />
 
-                  <Text style={styles.badgeText}>{user?.gender || "User"}</Text>
+                  <Text style={styles.badgeText}>{user.gender}</Text>
                 </View>
 
                 <View style={styles.locationBadge}>
@@ -85,7 +104,7 @@ export default function Profile() {
 
             <View style={styles.glassCard}>
               <Text style={styles.bioText}>
-                {user?.bio || "No bio added yet"}
+                {user.bio || "No bio added yet"}
               </Text>
             </View>
           </View>
@@ -96,11 +115,22 @@ export default function Profile() {
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {(user?.photos || []).map((photo: string, index: number) => (
-                <Image
+                <TouchableOpacity
                   key={index}
-                  source={{ uri: photo }}
-                  style={styles.galleryImage}
-                />
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setViewerImage(photo);
+                    setViewerVisible(true);
+                  }}
+                >
+                  <Image
+                    key={`${photo}-${index}`}
+                    source={{
+                      uri: `${photo}?t=${Date.now()}`,
+                    }}
+                    style={styles.galleryImage}
+                  />
+                </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
@@ -157,7 +187,22 @@ export default function Profile() {
               <Text style={styles.logoutText}>Logout</Text>
             </TouchableOpacity>
           </View>
+          <Modal visible={viewerVisible} transparent animationType="fade">
+            <View style={styles.viewerContainer}>
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={() => setViewerVisible(false)}
+              >
+                <Ionicons name="close" size={34} color="#fff" />
+              </TouchableOpacity>
 
+              <Image
+                source={{ uri: viewerImage }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+            </View>
+          </Modal>
           <View style={{ height: 120 }} />
         </ScrollView>
       </FadeWrapper>
@@ -166,6 +211,16 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
+  emptyProfile: {
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#ff4d6d",
+  },
   supportText: {
     color: "rgba(255,255,255,0.6)",
     fontSize: 12,
@@ -305,6 +360,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     marginTop: 8,
+  },
+  viewerContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  fullImage: {
+    width: "100%",
+    height: "85%",
+  },
+
+  closeBtn: {
+    position: "absolute",
+    top: 60,
+    right: 25,
+    zIndex: 10,
   },
 
   logoutText: {

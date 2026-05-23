@@ -1,13 +1,21 @@
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  BackHandler,
+  Image,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { sendPersonalNotification } from "../../services/notificationService";
 
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   addDoc,
   arrayUnion,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -46,7 +54,6 @@ export default function Home() {
   const focusUserId = Array.isArray(focusUser) ? focusUser[0] : focusUser;
 
   const [users, setUsers] = useState<SwipeUser[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [matchPair, setMatchPair] = useState<{
@@ -55,9 +62,10 @@ export default function Home() {
   } | null>(null);
 
   const historyRef = useRef<SwipeUser[]>([]);
-
+  // ✅ UPDATE FUNCTION LOGIC:
   const loadUsers = useCallback(async () => {
     try {
+      setLoading(true);
       const currentUid = auth.currentUser?.uid;
       if (!currentUid) {
         setLoading(false);
@@ -71,20 +79,37 @@ export default function Home() {
       const disliked = userData?.disliked || [];
       const superliked = userData?.superliked || [];
 
-      const snap = await getDocs(collection(db, "users"));
+      // 1. Ekdum pehle jaisi normal aur sidhi query bina kisi firebase filter ke
+      const q = query(collection(db, "users"));
+      const snap = await getDocs(q);
       const list: SwipeUser[] = [];
 
       snap.forEach((docSnap) => {
         if (docSnap.id === currentUid) return;
+
+        const isFocusedUser = docSnap.id === focusUserId;
+
         if (
-          docSnap.id !== focusUser && // 🔥 ye add
-          (liked.includes(docSnap.id) ||
-            disliked.includes(docSnap.id) ||
-            superliked.includes(docSnap.id))
-        )
+          !isFocusedUser &&
+          (liked?.includes(docSnap.id) ||
+            superliked?.includes(docSnap.id) ||
+            disliked?.includes(docSnap.id))
+        ) {
           return;
+        }
 
         const data = docSnap.data();
+
+        // 🔥 WAPAS PAWRA PEHLE WALA NORMAL FILTER (MALE TO FEMALE / FEMALE TO MALE)
+        const myGender = myProfile?.gender?.toLowerCase();
+        const otherGender = data.gender?.toLowerCase();
+
+        if (
+          (myGender === "male" && otherGender !== "female") ||
+          (myGender === "female" && otherGender !== "male")
+        ) {
+          return; // Agar gender match nahi hua toh yahi se skip
+        }
 
         const photos = Array.isArray(data.photos)
           ? data.photos.filter((p: string) => p && p.trim() !== "")
@@ -95,10 +120,7 @@ export default function Home() {
           ...(data.video && data.video.trim() !== "" ? [data.video] : []),
         ];
 
-        if (media.length === 0) return;
-
         let distance;
-
         if (
           myProfile?.latitude &&
           myProfile?.longitude &&
@@ -127,120 +149,192 @@ export default function Home() {
           gender: data.gender,
         });
       });
+
+      // Images prefetch background me
       list.forEach((user) => {
         user.media.forEach((url) => {
           if (url && url.startsWith("http")) {
-            Image.prefetch(url);
+            Image.prefetch(url).catch(() => {});
           }
         });
       });
+
+      if (focusUserId) {
+        list.sort((a, b) => {
+          if (a.id === focusUserId) return -1;
+          if (b.id === focusUserId) return 1;
+          return 0;
+        });
+      }
+
+      console.log("TOTAL LOADED USERS:", list.length);
       setUsers(list);
     } catch (error) {
       console.error("Error loading users:", error);
     } finally {
       setLoading(false);
     }
-  }, [myProfile]);
+  }, [myProfile, focusUserId]);
 
+  // 🔥 EDIT YAHAN HAI: [loadUsers] ko hata kar khali [] kar diya hai
   useEffect(() => {
     loadUsers();
-  }, [loadUsers]);
-  useEffect(() => {
-    if (focusUser && users.length > 0) {
-      const index = users.findIndex((u) => u.id === focusUser);
+  }, [focusUserId]); // 👈 Isse data sirf ek baar screen khulne par load hoga, har swipe par nahi
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        BackHandler.exitApp();
+        return true;
+      };
 
-      if (index !== -1) {
-        setCurrentIndex(index);
-      }
-    }
-  }, [focusUser, users]);
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, []),
+  );
 
   const handleSwipe = useCallback(
     async (action: SwipeAction) => {
-      const target = users[currentIndex];
-      const myUid = auth.currentUser?.uid;
+      let target: SwipeUser | null = null;
 
-      if (!target || !myUid) return;
+      setUsers((prev) => {
+        if (prev.length === 0) return prev;
 
-      try {
-        historyRef.current.push(target);
+        target = prev[0];
 
-        if (action === "like" || action === "superlike") {
-          // 1. Database Update
-          await updateDoc(doc(db, "users", myUid), {
-            [action === "superlike" ? "superliked" : "liked"]: arrayUnion(
-              target.id,
-            ),
-          });
+        const updated = prev.slice(1);
 
-          await addDoc(collection(db, "likes"), {
-            from: myUid,
-            to: target.id,
-            type: action,
-          });
+        // 🔥 Focused user swipe hone ke baad normal home pe wapas
+        if (focusUserId && target?.id === focusUserId) {
+          setTimeout(() => {
+            router.replace("/home");
+          }, 100);
+        }
 
-          // 2. Send "Someone Likes You" Notification
-          await sendPersonalNotification(
-            target.id,
-            action === "superlike" ? "Super Like! ⭐" : "Someone Likes You! ❤️",
-            `${myProfile?.name || "Someone"} ${action === "superlike" ? "super-liked" : "liked"} your profile!`,
-          );
+        return updated;
+      });
 
-          // 3. Check for Match
-          const q = query(
-            collection(db, "likes"),
-            where("from", "==", target.id),
-            where("to", "==", myUid),
-          );
+      // ... baaki ka setTimeout wala code same rahega
 
-          const snap = await getDocs(q);
+      // 2. Choti si deri (0ms) ke sath database ko background mein update hone do
+      setTimeout(async () => {
+        const myUid = auth.currentUser?.uid;
+        if (!target || !myUid) return;
 
-          if (!snap.empty) {
-            const roomId = [myUid, target.id].sort().join("_");
+        try {
+          historyRef.current.push(target);
 
-            await setDoc(doc(db, "chatRooms", roomId), {
-              users: [myUid, target.id],
+          if (action === "like" || action === "superlike") {
+            // Database Update
+            await updateDoc(doc(db, "users", myUid), {
+              [action === "superlike" ? "superliked" : "liked"]: arrayUnion(
+                target.id,
+              ),
+            });
+
+            await addDoc(collection(db, "likes"), {
+              from: myUid,
+              to: target.id,
+              type: action,
               createdAt: Date.now(),
             });
 
-            // 4. Send Match Notification to the other user
+            // Send Notification
             await sendPersonalNotification(
               target.id,
-              "It's a Match! 🔥",
-              `You and ${myProfile?.name} have matched! Start chatting now.`,
+              action === "superlike"
+                ? "Super Like! ⭐"
+                : "Someone Likes You! ❤️",
+              `${myProfile?.name || "Someone"} ${action === "superlike" ? "super-liked" : "liked"} your profile!`,
             );
 
-            setMatchPair({
-              currentUser: {
-                id: myUid,
-                name: myProfile?.name || "You",
-                age: myProfile?.age || 18,
-                bio: myProfile?.bio || "",
-                media: myProfile?.photos || [],
-              },
-              matchedUser: target,
+            // Check for Match
+            const q = query(
+              collection(db, "likes"),
+              where("from", "==", target.id),
+              where("to", "==", myUid),
+            );
+
+            const snap = await getDocs(q);
+            console.log("SNAP SIZE:", snap.size);
+
+            if (!snap.empty) {
+              const roomId = [myUid, target.id].sort().join("_");
+
+              await setDoc(doc(db, "chatRooms", roomId), {
+                users: [myUid, target.id],
+                createdAt: Date.now(),
+              });
+
+              // 🔥 Match hone ke baad LikesYou se remove
+              const likesQuery = query(
+                collection(db, "likes"),
+                where("from", "==", target.id),
+                where("to", "==", myUid),
+              );
+
+              const likesSnap = await getDocs(likesQuery);
+
+              likesSnap.forEach(async (d) => {
+                await deleteDoc(doc(db, "likes", d.id));
+              });
+
+              await sendPersonalNotification(
+                target.id,
+                "It's a Match! 🔥",
+                `You and ${myProfile?.name} have matched! Start chatting now.`,
+              );
+
+              setMatchPair({
+                currentUser: {
+                  id: myUid,
+                  name: myProfile?.name || "You",
+                  age: myProfile?.age || 18,
+                  bio: myProfile?.bio || "",
+                  media: myProfile?.photos || [],
+                },
+                matchedUser: target,
+              });
+            }
+            // 🔥 Match hone ke baad LikesYou se hatao
+          }
+
+          if (action === "dislike") {
+            await updateDoc(doc(db, "users", myUid), {
+              disliked: arrayUnion(target.id),
+            });
+
+            // 🔥 LikesYou se bhi hatao
+            const dislikeLikeQuery = query(
+              collection(db, "likes"),
+              where("from", "==", target.id),
+              where("to", "==", myUid),
+            );
+
+            const dislikeSnap = await getDocs(dislikeLikeQuery);
+
+            dislikeSnap.forEach(async (d) => {
+              await deleteDoc(doc(db, "likes", d.id));
             });
           }
+        } catch (error) {
+          console.error("Swipe error in background:", error);
         }
-
-        if (action === "dislike") {
-          await updateDoc(doc(db, "users", myUid), {
-            disliked: arrayUnion(target.id),
-          });
-        }
-
-        setCurrentIndex((prev) => prev + 1);
-      } catch (error) {
-        console.error("Swipe error:", error);
-      }
+      }, 0);
     },
-    [users, currentIndex, myProfile],
+    [myProfile, focusUserId], // 👈 Isme se 'users' hata diya hai taaki purane data ka conflict na ho
   );
 
   const handleUndo = () => {
     if (historyRef.current.length > 0) {
-      historyRef.current.pop();
-      setCurrentIndex((prev) => Math.max(0, prev - 1));
+      const lastUser = historyRef.current.pop();
+
+      if (lastUser) {
+        setUsers((prev) => [lastUser, ...prev]);
+      }
     }
   };
 
@@ -255,7 +349,7 @@ export default function Home() {
     );
   }
 
-  const currentUser = users[currentIndex];
+  const currentUser = users[0];
 
   if (!currentUser) {
     return (
@@ -274,7 +368,7 @@ export default function Home() {
     <IndoreBackground>
       <View style={styles.container}>
         <SwipeStack
-          users={users.slice(currentIndex, currentIndex + 3)}
+          users={users}
           onSwipe={handleSwipe}
           onCardPress={() => router.push(`/user/${currentUser.id}`)}
           onUndo={handleUndo}

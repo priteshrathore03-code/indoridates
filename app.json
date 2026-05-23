@@ -5,21 +5,21 @@
     "scheme": "indoridates",
     "version": "1.0.1",
     "orientation": "portrait",
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
+    "platforms": ["ios", "android", "web"],
     "jsEngine": "hermes",
-    "plugins": [
-      "expo-router",
-      "expo-web-browser"
-    ],
+    "plugins": ["expo-router", "expo-web-browser"],
+    "icon": "./assets/images/icon.png",
+
     "android": {
-  "package": "com.indoridates.app2",
-  "versionCode": 3,
-  "googleServicesFile": "./google-services.json"
-},
+      "package": "com.indoridates.app2",
+      "versionCode": 4,
+      "googleServicesFile": "./google-services.json",
+
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
     "ios": {
       "bundleIdentifier": "com.indoridates.app",
       "buildNumber": "2",

@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import {
   collection,
@@ -10,7 +11,6 @@ import {
 } from "firebase/firestore";
 import { Platform } from "react-native";
 import { db } from "../firebaseConfig";
-
 export const sendPersonalNotification = async (
   targetUid: string,
   title: string,
@@ -101,9 +101,20 @@ export const registerForPushNotifications = async (userId: string) => {
 
     if (finalStatus !== "granted") return;
 
-    const tokenData = await Notifications.getExpoPushTokenAsync();
+    let token = "";
 
-    const token = tokenData.data;
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra?.eas?.projectId,
+      });
+
+      token = tokenData.data;
+
+      console.log("✅ EXPO TOKEN:", token);
+    } catch (e) {
+      console.log("❌ Expo token fetch failed");
+      return;
+    }
 
     if (token && userId) {
       await setDoc(

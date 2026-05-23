@@ -18,6 +18,9 @@ export default function CreatePlan() {
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("");
   const [brief, setBrief] = useState("");
+  const [visibleTo, setVisibleTo] = useState<
+  "male" | "female" | "everyone"
+>("male");
 
   const handleCreate = async () => {
     if (!user) {
@@ -41,6 +44,7 @@ export default function CreatePlan() {
         accepted: "",
         status: "open",
         createdAt: Date.now(),
+        visibleTo,
       });
 
       Alert.alert("Success", "Plan Created 🚀");
@@ -77,6 +81,43 @@ export default function CreatePlan() {
         multiline
       />
 
+      <Text style={styles.visibilityTitle}>
+  Who can see this plan?
+</Text>
+
+<View style={styles.visibilityContainer}>
+  <TouchableOpacity
+    style={[
+      styles.visibilityButton,
+      visibleTo === "male" && styles.activeVisibility,
+    ]}
+    onPress={() => setVisibleTo("male")}
+  >
+    <Text style={styles.visibilityText}>👦 Only Boys</Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={[
+      styles.visibilityButton,
+      visibleTo === "female" && styles.activeVisibility,
+    ]}
+    onPress={() => setVisibleTo("female")}
+  >
+    <Text style={styles.visibilityText}>👧 Only Girls</Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={[
+      styles.visibilityButton,
+      visibleTo === "everyone" &&
+        styles.activeVisibility,
+    ]}
+    onPress={() => setVisibleTo("everyone")}
+  >
+    <Text style={styles.visibilityText}>🌍 Everyone</Text>
+  </TouchableOpacity>
+</View>
+
       <TouchableOpacity style={styles.button} onPress={handleCreate}>
         <Text style={styles.buttonText}>Create</Text>
       </TouchableOpacity>
@@ -107,6 +148,33 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
+  visibilityTitle: {
+  fontSize: 16,
+  fontWeight: "bold",
+  marginBottom: 10,
+},
+
+visibilityContainer: {
+  marginBottom: 20,
+},
+
+visibilityButton: {
+  padding: 12,
+  borderRadius: 10,
+  borderWidth: 1,
+  borderColor: "#ccc",
+  marginBottom: 10,
+},
+
+activeVisibility: {
+  backgroundColor: "#ff4d6d",
+  borderColor: "#ff4d6d",
+},
+
+visibilityText: {
+  color: "#000",
+  fontWeight: "600",
+},
   buttonText: {
     color: "white",
     fontWeight: "bold",

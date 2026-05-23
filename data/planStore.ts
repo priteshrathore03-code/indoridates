@@ -15,9 +15,17 @@ export type PlanType = {
   title: string;
   time: string;
   brief: string;
+
+  visibleTo?: "male" | "female" | "everyone";
+
   createdBy: string;
   createdByName?: string;
-  requests: string[];
+  createdByPhoto?: string;
+  requests: {
+    uid: string;
+    name: string;
+    photo: string;
+  }[];
   accepted: string;
   status: PlanStatus;
   createdAt: number;
@@ -49,6 +57,7 @@ export const listenPlans = (callback: (plans: PlanType[]) => void) => {
         accepted: data.accepted || "",
         status: data.status || "open",
         createdAt: data.createdAt,
+        visibleTo: data.visibleTo || "male",
       });
     });
 

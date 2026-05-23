@@ -1,11 +1,11 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -29,7 +29,6 @@ import {
 } from "../../data/planStore";
 
 import { useUserProfile } from "../../data/userProfile";
-import { db } from "../../firebaseConfig";
 
 import FadeWrapper from "../components/FadeWrapper";
 import IndoreBackground from "../components/IndoreBackground";
@@ -39,12 +38,16 @@ export default function Todo() {
   const { user } = useUserProfile();
 
   const [plans, setPlans] = useState<PlanType[]>([]);
-  const [usersMap, setUsersMap] = useState<any>({});
   const [showForm, setShowForm] = useState(false);
 
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("");
   const [brief, setBrief] = useState("");
+  const [visibleTo, setVisibleTo] = useState<"male" | "female" | "everyone">(
+    "male",
+  );
+  const [expandedPlans, setExpandedPlans] = useState<string[]>([]);
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
 
   const hasActivePlan = plans.some((p) => p.createdBy === user?.uid);
 
@@ -64,46 +67,47 @@ export default function Todo() {
       });
 
       setPlans(validPlans);
-      await fetchUsers(validPlans);
     });
 
     return () => unsubscribe();
   }, []);
-
-  const fetchUsers = async (plansData: PlanType[]) => {
-    const map: any = {};
-
-    for (const plan of plansData) {
-      if (!map[plan.createdBy]) {
-        const snap = await getDoc(doc(db, "users", plan.createdBy));
-        if (snap.exists()) {
-          map[plan.createdBy] = snap.data();
-        }
-      }
-
-      for (const reqUid of plan.requests) {
-        if (!map[reqUid]) {
-          const snap = await getDoc(doc(db, "users", reqUid));
-          if (snap.exists()) {
-            map[reqUid] = snap.data();
-          }
-        }
-      }
-    }
-
-    setUsersMap(map);
-  };
 
   if (!user) return null;
 
   const visiblePlans = plans.filter((plan) => {
     const isMyPlan = plan.createdBy === user.uid;
 
-    if (user.gender === "female") {
-      return isMyPlan;
+    // Female host always sees her own plan
+    if (isMyPlan) {
+      return true;
     }
 
-    return plan.status === "open";
+    // Closed plans hide
+    if (plan.status !== "open") {
+      return false;
+    }
+
+    // Old plans without visibleTo
+    if (!plan.visibleTo) {
+      return true;
+    }
+
+    // Plan visible to everyone
+    if (plan.visibleTo === "everyone") {
+      return true;
+    }
+
+    // Male users
+    if (user.gender === "male" && plan.visibleTo === "male") {
+      return true;
+    }
+
+    // Female users
+    if (user.gender === "female" && plan.visibleTo === "female") {
+      return true;
+    }
+
+    return false;
   });
 
   const handleCreate = async () => {
@@ -116,11 +120,16 @@ export default function Todo() {
       title,
       time,
       brief,
+
       createdBy: user.uid,
+      createdByName: user.name || "User",
+      createdByPhoto: user.photos?.[0] || "",
+
       createdAt: Date.now(),
       requests: [],
       accepted: "",
       status: "open",
+      visibleTo,
     });
 
     setTitle("");
@@ -145,13 +154,20 @@ export default function Todo() {
   const handleInterested = async (plan: PlanType) => {
     if (!plan.id) return;
 
-    if (plan.requests.includes(user.uid)) {
+    if (plan.requests.some((r) => r.uid === user.uid)) {
       Alert.alert("Already Sent", "You have already requested to join.");
       return;
     }
 
     await updatePlan(plan.id, {
-      requests: [...plan.requests, user.uid],
+      requests: [
+        ...plan.requests,
+        {
+          uid: user.uid,
+          name: user.name || "User",
+          photo: user.photos?.[0] || "",
+        },
+      ],
     });
 
     await sendPersonalNotification(
@@ -174,11 +190,11 @@ export default function Todo() {
       `${user.name} accepted your request. Let's chat!`,
     );
 
-    const otherUsers = plan.requests.filter((uid) => uid !== reqUid);
+    const otherUsers = plan.requests.filter((r) => r.uid !== reqUid);
 
-    for (const uid of otherUsers) {
+    for (const otherUser of otherUsers) {
       await sendPersonalNotification(
-        uid,
+        otherUser.uid,
         "Plan Closed ❌",
         "This plan has already been accepted by someone else.",
       );
@@ -195,11 +211,27 @@ export default function Todo() {
       <FadeWrapper>
         <SafeAreaView style={{ flex: 1 }}>
           <ScrollView
+            removeClippedSubviews={true}
+            showsVerticalScrollIndicator={false}
             style={styles.container}
             contentContainerStyle={{ paddingBottom: 120 }}
           >
+            {visiblePlans.length === 0 && (
+              <View style={styles.emptyContainer}>
+                <Feather
+                  name="calendar"
+                  size={70}
+                  color="rgba(255,255,255,0.5)"
+                />
+
+                <Text style={styles.emptyTitle}>No Plans Yet</Text>
+              </View>
+            )}
             {visiblePlans.map((plan) => {
-              const creator = usersMap[plan.createdBy];
+              const creator = {
+                name: plan.createdByName,
+                photos: [plan.createdByPhoto],
+              };
               const isMyPlan = plan.createdBy === user.uid;
 
               return (
@@ -216,6 +248,9 @@ export default function Todo() {
                             "https://via.placeholder.com/150",
                         }}
                         style={styles.profileImage}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={100}
                       />
                       <View>
                         <Text style={styles.name}>
@@ -239,13 +274,15 @@ export default function Todo() {
                     <TouchableOpacity
                       style={[
                         styles.interestBtn,
-                        plan.requests.includes(user.uid) && { opacity: 0.6 },
+                        plan.requests.some((r) => r.uid === user.uid) && {
+                          opacity: 0.6,
+                        },
                       ]}
                       onPress={() => handleInterested(plan)}
-                      disabled={plan.requests.includes(user.uid)}
+                      disabled={plan.requests.some((r) => r.uid === user.uid)}
                     >
                       <Text style={styles.btnText}>
-                        {plan.requests.includes(user.uid)
+                        {plan.requests.some((r) => r.uid === user.uid)
                           ? "Request Sent"
                           : "Interested"}
                       </Text>
@@ -254,41 +291,83 @@ export default function Todo() {
 
                   {isMyPlan && plan.requests.length > 0 && (
                     <View style={styles.requestSection}>
-                      <Text style={styles.requestCount}>
-                        Requests ({plan.requests.length})
-                      </Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (expandedPlans.includes(plan.id!)) {
+                            setExpandedPlans((prev) =>
+                              prev.filter((id) => id !== plan.id),
+                            );
+                            return;
+                          }
 
-                      {plan.requests.map((reqUid) => {
-                        const reqUser = usersMap[reqUid];
+                          setLoadingPlanId(plan.id!);
 
-                        return (
-                          <View key={reqUid} style={styles.reqUserRow}>
-                            <TouchableOpacity
-                              style={styles.reqInfo}
-                              onPress={() => router.push(`/user/${reqUid}`)}
-                            >
-                              <Image
-                                source={{
-                                  uri:
-                                    reqUser?.photos?.[0] ||
-                                    "https://via.placeholder.com/150",
-                                }}
-                                style={styles.reqAvatar}
-                              />
-                              <Text style={styles.reqName}>
-                                {reqUser?.name || "User"}
-                              </Text>
-                            </TouchableOpacity>
+                          setTimeout(() => {
+                            setExpandedPlans((prev) => [...prev, plan.id!]);
+                            setLoadingPlanId(null);
+                          }, 300);
+                        }}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: 12,
+                        }}
+                      >
+                        <Text style={styles.requestCount}>
+                          Interests ({plan.requests.length})
+                        </Text>
 
-                            <TouchableOpacity
-                              style={styles.smallAcceptBtn}
-                              onPress={() => handleAccept(plan, reqUid)}
-                            >
-                              <Text style={styles.smallBtnText}>Accept</Text>
-                            </TouchableOpacity>
-                          </View>
-                        );
-                      })}
+                        {loadingPlanId === plan.id ? (
+                          <ActivityIndicator size="small" color="#FFD700" />
+                        ) : (
+                          <Ionicons
+                            name={
+                              expandedPlans.includes(plan.id!)
+                                ? "chevron-up"
+                                : "chevron-down"
+                            }
+                            size={20}
+                            color="#FFD700"
+                          />
+                        )}
+                      </TouchableOpacity>
+
+                      {expandedPlans.includes(plan.id!) &&
+                        plan.requests.map((reqUser) => {
+                          return (
+                            <View key={reqUser.uid} style={styles.reqUserRow}>
+                              <TouchableOpacity
+                                style={styles.reqInfo}
+                                onPress={() =>
+                                  router.push(`/user/${reqUser.uid}`)
+                                }
+                              >
+                                <Image
+                                  source={{
+                                    uri:
+                                      reqUser.photo ||
+                                      "https://via.placeholder.com/150",
+                                  }}
+                                  style={styles.reqAvatar}
+                                  contentFit="cover"
+                                  cachePolicy="memory-disk"
+                                  transition={100}
+                                />
+                                <Text style={styles.reqName}>
+                                  {reqUser.name}
+                                </Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={styles.smallAcceptBtn}
+                                onPress={() => handleAccept(plan, reqUser.uid)}
+                              >
+                                <Text style={styles.smallBtnText}>Accept</Text>
+                              </TouchableOpacity>
+                            </View>
+                          );
+                        })}
                     </View>
                   )}
                 </View>
@@ -333,7 +412,45 @@ export default function Todo() {
                     onChangeText={setBrief}
                   />
                 </View>
+                <Text style={styles.requestCount}>Who can see this plan?</Text>
 
+                <View style={{ marginBottom: 15 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.interestBtn,
+                      visibleTo === "male" && {
+                        backgroundColor: "#3b82f6",
+                      },
+                    ]}
+                    onPress={() => setVisibleTo("male")}
+                  >
+                    <Text style={styles.btnText}>👦 Only Boys</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.interestBtn,
+                      visibleTo === "female" && {
+                        backgroundColor: "#ec4899",
+                      },
+                    ]}
+                    onPress={() => setVisibleTo("female")}
+                  >
+                    <Text style={styles.btnText}>👧 Only Girls</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.interestBtn,
+                      visibleTo === "everyone" && {
+                        backgroundColor: "#10b981",
+                      },
+                    ]}
+                    onPress={() => setVisibleTo("everyone")}
+                  >
+                    <Text style={styles.btnText}>🌍 Everyone</Text>
+                  </TouchableOpacity>
+                </View>
                 <TouchableOpacity onPress={handleCreate}>
                   <LinearGradient
                     colors={["#ffb347", "#ff416c", "#ff2d95"]}
@@ -492,6 +609,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
+  },
+
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 180,
+  },
+
+  emptyTitle: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginTop: 18,
   },
   createText: { color: "white", fontWeight: "bold", fontSize: 18 },
 });
