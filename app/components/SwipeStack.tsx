@@ -58,8 +58,9 @@ const SwipeStack: React.FC<SwipeStackProps> = ({
   return (
     <View style={styles.container}>
       {/* Profile Card */}
-      <View key={currentUser.id} style={styles.cardWrapper}>
+      <View style={styles.cardWrapper}>
   <SwipeCard
+  key={currentUser.id}
     user={currentUser}
     mediaIndex={mediaIndex}
     onMediaPrev={handlePrev}

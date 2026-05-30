@@ -178,8 +178,10 @@ export default function Home() {
 
   // 🔥 EDIT YAHAN HAI: [loadUsers] ko hata kar khali [] kar diya hai
   useEffect(() => {
+    if (!myProfile?.gender) return;
+
     loadUsers();
-  }, [focusUserId]); // 👈 Isse data sirf ek baar screen khulne par load hoga, har swipe par nahi
+  }, [loadUsers, myProfile?.gender]); // 👈 Isse data sirf ek baar screen khulne par load hoga, har swipe par nahi
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {

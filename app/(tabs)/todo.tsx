@@ -66,6 +66,21 @@ export default function Todo() {
         return true;
       });
 
+      validPlans.forEach((plan) => {
+        // 1. Host ki photo prefetch karo
+        if (plan.createdByPhoto && plan.createdByPhoto.startsWith("http")) {
+          Image.prefetch(plan.createdByPhoto).catch(() => {});
+        }
+        // 2. Agar koi request aayi hai toh un users ki photos bhi pehle se hi load kar lo
+        if (plan.requests && Array.isArray(plan.requests)) {
+          plan.requests.forEach((req) => {
+            if (req.photo && req.photo.startsWith("http")) {
+              Image.prefetch(req.photo).catch(() => {});
+            }
+          });
+        }
+      });
+
       setPlans(validPlans);
     });
 
@@ -250,7 +265,8 @@ export default function Todo() {
                         style={styles.profileImage}
                         contentFit="cover"
                         cachePolicy="memory-disk"
-                        transition={100}
+                        priority="high"
+                        transition={50}
                       />
                       <View>
                         <Text style={styles.name}>

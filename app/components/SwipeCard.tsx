@@ -1,5 +1,5 @@
 import { ResizeMode, Video } from "expo-av";
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -20,117 +20,120 @@ interface SwipeCardProps {
   style?: any;
 }
 
-const SwipeCard = 
-  ({
-    user,
-    mediaIndex,
-    onMediaPrev,
-    onMediaNext,
-    onPress,
-    style,
-  }: SwipeCardProps) => {
-    if (!user) return null;
+const SwipeCard = ({
+  user,
+  mediaIndex,
+  onMediaPrev,
+  onMediaNext,
+  onPress,
+  style,
+}: SwipeCardProps) => {
+  if (!user) return null;
 
-    const currentMedia = user.media?.[mediaIndex];
+  const currentMedia = user.media?.[mediaIndex];
 
-    const isVideo = useMemo(
-      () => typeof currentMedia === "string" && currentMedia.includes(".mp4"),
-      [currentMedia],
-    );
+  if (!currentMedia) {
+    return <View style={styles.imageContainer} />;
+  }
 
-    const [loaded, setLoaded] = useState(false);
-    useEffect(() => {
-      setLoaded(false);
-    }, [currentMedia]);
+  const isVideo = useMemo(
+    () => typeof currentMedia === "string" && currentMedia.includes(".mp4"),
+    [currentMedia],
+  );
 
-    return (
-      <Animated.View style={[styles.card, style]}>
-        <View style={{ flex: 1 }}>
-          {isVideo ? (
-            <Video
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    setLoaded(false);
+  }, [currentMedia]);
+
+  return (
+    <Animated.View style={[styles.card, style]}>
+      <View style={{ flex: 1 }}>
+        {isVideo ? (
+          <Video
+            key={currentMedia}
+            source={{ uri: currentMedia }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={false}
+            isLooping
+          />
+        ) : (
+          <View style={styles.imageContainer}>
+            {!loaded && (
+              <ActivityIndicator
+                size="large"
+                color="#fff"
+                style={styles.loader}
+              />
+            )}
+
+            <Image
               key={currentMedia}
               source={{ uri: currentMedia }}
               style={StyleSheet.absoluteFillObject}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay={false}
-              isLooping
-            />
-          ) : (
-            <View style={styles.imageContainer}>
-              {!loaded && (
-                <ActivityIndicator
-                  size="large"
-                  color="#fff"
-                  style={styles.loader}
-                />
-              )}
-
-              <Image
-                key={currentMedia}
-                source={{ uri: currentMedia }}
-                style={StyleSheet.absoluteFillObject}
-                resizeMode="cover"
-                onLoad={() => setLoaded(true)}
-                fadeDuration={0}
-              />
-            </View>
-          )}
-
-          {/* Tap Controls */}
-          <View style={styles.controls} pointerEvents="box-none">
-            <TouchableOpacity
-              style={styles.sideButton}
-              activeOpacity={1}
-              onPressIn={onMediaPrev}
-            />
-            <TouchableOpacity
-              style={styles.sideButton}
-              activeOpacity={1}
-              onPressIn={onMediaNext}
+              resizeMode="cover"
+              fadeDuration={0}
+              onLoadEnd={() => setLoaded(true)}
+              onError={() => setLoaded(true)}
             />
           </View>
+        )}
 
-          {/* Progress Bars */}
-          <View style={styles.progressContainer}>
-            {user.media?.map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.progressBar,
-                  {
-                    backgroundColor:
-                      i <= mediaIndex ? "#fff" : "rgba(255,255,255,0.3)",
-                  },
-                ]}
-              />
-            ))}
-          </View>
+        {/* Tap Controls */}
+        <View style={styles.controls} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.sideButton}
+            activeOpacity={1}
+            onPressIn={onMediaPrev}
+          />
+          <TouchableOpacity
+            style={styles.sideButton}
+            activeOpacity={1}
+            onPressIn={onMediaNext}
+          />
         </View>
 
-        {/* Info */}
-        <TouchableOpacity
-          style={styles.infoOverlay}
-          activeOpacity={0.8}
-          onPress={onPress}
-        >
-          <Text style={styles.name}>
-            {user.name}, {user.age}
+        {/* Progress Bars */}
+        <View style={styles.progressContainer}>
+          {user.media?.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.progressBar,
+                {
+                  backgroundColor:
+                    i <= mediaIndex ? "#fff" : "rgba(255,255,255,0.3)",
+                },
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+
+      {/* Info */}
+      <TouchableOpacity
+        style={styles.infoOverlay}
+        activeOpacity={0.8}
+        onPress={onPress}
+      >
+        <Text style={styles.name}>
+          {user.name}, {user.age}
+        </Text>
+
+        {user.bio ? (
+          <Text style={styles.bio} numberOfLines={2}>
+            {user.bio}
           </Text>
+        ) : null}
 
-          {user.bio ? (
-            <Text style={styles.bio} numberOfLines={2}>
-              {user.bio}
-            </Text>
-          ) : null}
-
-          {user.distance !== undefined && (
-            <Text style={styles.distance}>📍 {user.distance} km away</Text>
-          )}
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-
+        {user.distance !== undefined && (
+          <Text style={styles.distance}>📍 {user.distance} km away</Text>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
 const styles = StyleSheet.create({
   card: {

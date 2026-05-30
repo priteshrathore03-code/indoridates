@@ -1,4 +1,5 @@
 import { ResizeMode, Video } from "expo-av";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -108,8 +109,29 @@ export default function ProfilePhotos() {
 
         const fileName = `users/${firebaseUser.uid}/photo_${i}_${Date.now()}.jpg`;
 
-        // ✅ FIXED CALL
-        const url = await uploadToFirebase(uri, fileName);
+        let finalUriForUpload = uri;
+
+        try {
+          // 🔥 EDIT YAHAN HAI: Upload se theek pehle image ka resolution 800px width par scale karo aur compress karo
+          const compressedResult = await ImageManipulator.manipulateAsync(
+            uri,
+            [{ resize: { width: 800 } }], // Width max 800px kardi, mobile screen ke liye perfect crisp quality
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }, // 70% quality compression
+          );
+
+          finalUriForUpload = compressedResult.uri;
+          console.log(`Photo ${i} compressed successfully! Size reduced.`);
+        } catch (manipError) {
+          console.error(
+            "Compression failed, uploading original as fallback:",
+            manipError,
+          );
+          // Agar compression fail ho toh original uri hi use hogi (koi crash nahi hoga)
+          finalUriForUpload = uri;
+        }
+
+        // ✅ Ab uploadToFirebase me finalUriForUpload bhejenge (compressed waali)
+        const url = await uploadToFirebase(finalUriForUpload, fileName);
 
         const check = await checkImageSafety(url);
 

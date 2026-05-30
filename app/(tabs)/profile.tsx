@@ -1,8 +1,12 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { deleteUser } from "firebase/auth";
+import { deleteDoc, doc } from "firebase/firestore";
 import { useState } from "react";
 import {
+  Alert,
   Image,
   Linking,
   Modal,
@@ -12,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { auth, db } from "../../firebaseConfig";
 
 import { useUserProfile } from "../../data/userProfile";
 import FadeWrapper from "../components/FadeWrapper";
@@ -45,6 +50,45 @@ export default function Profile() {
     } catch (e) {
       console.log(e);
     }
+  };
+  const handleDeleteProfile = async () => {
+    Alert.alert(
+      "Delete Profile",
+      "Are you sure you want to permanently delete your account?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const currentUser = auth.currentUser;
+
+              if (!currentUser) return;
+
+              const uid = currentUser.uid;
+
+              // Firestore profile delete
+              await deleteDoc(doc(db, "users", uid));
+
+              // Firebase auth delete
+              await deleteUser(currentUser);
+
+              // Local storage clear
+              await AsyncStorage.clear();
+
+              // Redirect
+              router.replace("/welcome");
+            } catch (error) {
+              console.log("DELETE PROFILE ERROR:", error);
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -185,6 +229,14 @@ export default function Profile() {
               <Ionicons name="log-out-outline" size={20} color="#fff" />
 
               <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={handleDeleteProfile}
+            >
+              <Ionicons name="trash-outline" size={20} color="#fff" />
+
+              <Text style={styles.deleteText}>Delete My Profile</Text>
             </TouchableOpacity>
           </View>
           <Modal visible={viewerVisible} transparent animationType="fade">
@@ -360,6 +412,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     marginTop: 8,
+  },
+  deleteBtn: {
+    backgroundColor: "#ff3b30",
+    borderRadius: 20,
+    padding: 18,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 6,
+  },
+
+  deleteText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
   },
   viewerContainer: {
     flex: 1,
