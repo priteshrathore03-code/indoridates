@@ -118,9 +118,28 @@ export default function Profile() {
             )}
 
             <View style={styles.infoSection}>
-              <Text style={styles.name}>
-                {user.name}, <Text style={styles.age}>{user.age}</Text>
-              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={styles.name}>
+                  {user.name}, <Text style={styles.age}>{user.age}</Text>
+                </Text>
+
+                {user?.verification?.status === "verified" && (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={22}
+                    color="#1DA1F2"
+                    style={{
+                      marginLeft: 8,
+                      marginTop: 2,
+                    }}
+                  />
+                )}
+              </View>
 
               <View style={styles.badgeRow}>
                 <View style={styles.genderBadge}>
@@ -141,7 +160,50 @@ export default function Profile() {
               </View>
             </View>
           </LinearGradient>
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.verifyCard}
+              disabled={user?.verification?.status === "verified"}
+              onPress={() => {
+                if (user?.verification?.status !== "verified") {
+                  router.push("/verification");
+                }
+              }}
+            >
+              <Ionicons
+                name={
+                  user?.verification?.status === "verified"
+                    ? "checkmark-circle"
+                    : "shield-checkmark"
+                }
+                size={34}
+                color="#00E676"
+              />
 
+              <View
+                style={{
+                  flex: 1,
+                  marginLeft: 15,
+                }}
+              >
+                <Text style={styles.verifyTitle}>
+                  {user?.verification?.status === "verified"
+                    ? "Verified"
+                    : "Get Verified"}
+                </Text>
+
+                <Text style={styles.verifySubtitle}>
+                  {user?.verification?.status === "verified"
+                    ? "Your profile has been successfully verified."
+                    : "Verify your profile and earn the Verified Badge."}
+                </Text>
+              </View>
+
+              {user?.verification?.status !== "verified" && (
+                <Ionicons name="chevron-forward" size={22} color="#999" />
+              )}
+            </TouchableOpacity>
+          </View>
           {/* ABOUT */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About Me</Text>
@@ -452,5 +514,26 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  verifyCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  verifyTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+
+  verifySubtitle: {
+    color: "#aaa",
+    fontSize: 14,
+    marginTop: 5,
   },
 });

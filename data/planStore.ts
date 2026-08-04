@@ -29,6 +29,8 @@ export type PlanType = {
   accepted: string;
   status: PlanStatus;
   createdAt: number;
+  latitude?: number;
+longitude?: number;
 };
 
 const plansCollection = collection(db, "plans");

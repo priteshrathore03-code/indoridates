@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -19,8 +20,11 @@ import {
   doc,
   getDoc,
   getDocs,
+  increment,
+  limit,
   query,
   setDoc,
+  startAfter,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -55,6 +59,8 @@ export default function Home() {
 
   const [users, setUsers] = useState<SwipeUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [limitReached, setLimitReached] = useState(false);
+  const [timeLeft, setTimeLeft] = useState("");
 
   const [matchPair, setMatchPair] = useState<{
     currentUser: SwipeUser;
@@ -65,6 +71,18 @@ export default function Home() {
   // ✅ UPDATE FUNCTION LOGIC:
   const loadUsers = useCallback(async () => {
     try {
+      // const cached = await AsyncStorage.getItem("home_profiles");
+
+      // if (cached) {
+      //   const parsed = JSON.parse(cached);
+
+      //   if (parsed?.length > 0) {
+      //     console.log("USING CACHE:", parsed.length);
+
+      //     setUsers(parsed);
+      //     setLoading(false);
+      //   }
+      // }
       setLoading(true);
       const currentUid = auth.currentUser?.uid;
       if (!currentUid) {
@@ -75,82 +93,131 @@ export default function Home() {
       const userSnap = await getDoc(doc(db, "users", currentUid));
       const userData = userSnap.data();
 
+      const today = new Date().toISOString().split("T")[0];
+
+      if (userData?.dailyViewsDate !== today) {
+        await updateDoc(doc(db, "users", currentUid), {
+          dailyViews: 0,
+          dailyViewsDate: today,
+        });
+
+        if (userData) {
+          userData.dailyViews = 0;
+        }
+      }
+
+      if ((userData?.dailyViews || 0) >= 20) {
+        setLimitReached(true);
+        setLoading(false);
+        return;
+      }
+
       const liked = userData?.liked || [];
       const disliked = userData?.disliked || [];
       const superliked = userData?.superliked || [];
 
       // 1. Ekdum pehle jaisi normal aur sidhi query bina kisi firebase filter ke
-      const q = query(collection(db, "users"));
-      const snap = await getDocs(q);
+      const myGender = myProfile?.gender?.toLowerCase();
+
+      const targetGender = myGender === "male" ? "female" : "male";
+
+      const getBatch = async (lastDoc?: any) => {
+        const q = lastDoc
+          ? query(
+              collection(db, "users"),
+              where("gender", "==", targetGender),
+              startAfter(lastDoc),
+              limit(20),
+            )
+          : query(
+              collection(db, "users"),
+              where("gender", "==", targetGender),
+              limit(20),
+            );
+
+        return await getDocs(q);
+      };
+
+      let snap = await getBatch();
+
       const list: SwipeUser[] = [];
 
-      snap.forEach((docSnap) => {
-        if (docSnap.id === currentUid) return;
+      let lastDoc: any = undefined;
+      let hasMore = true;
 
-        const isFocusedUser = docSnap.id === focusUserId;
+      while (hasMore && list.length < 20) {
+        const snap = await getBatch(lastDoc);
 
-        if (
-          !isFocusedUser &&
-          (liked?.includes(docSnap.id) ||
-            superliked?.includes(docSnap.id) ||
-            disliked?.includes(docSnap.id))
-        ) {
-          return;
+        if (snap.empty) {
+          hasMore = false;
+          break;
         }
 
-        const data = docSnap.data();
+        lastDoc = snap.docs[snap.docs.length - 1];
 
-        // 🔥 WAPAS PAWRA PEHLE WALA NORMAL FILTER (MALE TO FEMALE / FEMALE TO MALE)
-        const myGender = myProfile?.gender?.toLowerCase();
-        const otherGender = data.gender?.toLowerCase();
+        for (const docSnap of snap.docs) {
+          if (docSnap.id === currentUid) continue;
 
-        if (
-          (myGender === "male" && otherGender !== "female") ||
-          (myGender === "female" && otherGender !== "male")
-        ) {
-          return; // Agar gender match nahi hua toh yahi se skip
+          const isFocusedUser = docSnap.id === focusUserId;
+
+          if (
+            !isFocusedUser &&
+            (liked.includes(docSnap.id) ||
+              disliked.includes(docSnap.id) ||
+              superliked.includes(docSnap.id))
+          ) {
+            continue;
+          }
+
+          const data = docSnap.data();
+
+          const photos = Array.isArray(data.photos)
+            ? data.photos.filter((p: string) => p && p.trim() !== "")
+            : [];
+
+          const media = [
+            ...photos,
+            ...(data.video && data.video.trim() !== "" ? [data.video] : []),
+          ];
+
+          let distance;
+
+          if (
+            myProfile?.latitude &&
+            myProfile?.longitude &&
+            data.latitude &&
+            data.longitude
+          ) {
+            distance = Math.round(
+              getDistance(
+                myProfile.latitude,
+                myProfile.longitude,
+                data.latitude,
+                data.longitude,
+              ),
+            );
+          }
+
+          list.push({
+            id: docSnap.id,
+            name: data.name || "User",
+            age: data.age || 18,
+            bio: data.bio || "",
+            media,
+            distance,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            gender: data.gender,
+          });
+
+          if (list.length >= 20) {
+            break;
+          }
         }
-
-        const photos = Array.isArray(data.photos)
-          ? data.photos.filter((p: string) => p && p.trim() !== "")
-          : [];
-
-        const media = [
-          ...photos,
-          ...(data.video && data.video.trim() !== "" ? [data.video] : []),
-        ];
-
-        let distance;
-        if (
-          myProfile?.latitude &&
-          myProfile?.longitude &&
-          data.latitude &&
-          data.longitude
-        ) {
-          distance = Math.round(
-            getDistance(
-              myProfile.latitude,
-              myProfile.longitude,
-              data.latitude,
-              data.longitude,
-            ),
-          );
-        }
-
-        list.push({
-          id: docSnap.id,
-          name: data.name || "User",
-          age: data.age || 18,
-          bio: data.bio || "",
-          media,
-          distance,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          gender: data.gender,
-        });
-      });
+      }
 
       // Images prefetch background me
+      // Images prefetch
       list.forEach((user) => {
         user.media.forEach((url) => {
           if (url && url.startsWith("http")) {
@@ -159,29 +226,102 @@ export default function Home() {
         });
       });
 
+      // 🔥 Likes se profile open hui hai
       if (focusUserId) {
-        list.sort((a, b) => {
-          if (a.id === focusUserId) return -1;
-          if (b.id === focusUserId) return 1;
-          return 0;
-        });
+        const focusedSnap = await getDoc(doc(db, "users", focusUserId));
+
+        if (focusedSnap.exists()) {
+          const data = focusedSnap.data();
+
+          const photos = Array.isArray(data.photos)
+            ? data.photos.filter((p: string) => p && p.trim() !== "")
+            : [];
+
+          const media = [
+            ...photos,
+            ...(data.video && data.video.trim() !== "" ? [data.video] : []),
+          ];
+
+          let distance;
+
+          if (
+            myProfile?.latitude &&
+            myProfile?.longitude &&
+            data.latitude &&
+            data.longitude
+          ) {
+            distance = Math.round(
+              getDistance(
+                myProfile.latitude,
+                myProfile.longitude,
+                data.latitude,
+                data.longitude,
+              ),
+            );
+          }
+
+          setUsers([
+            {
+              id: focusedSnap.id,
+              name: data.name || "User",
+              age: data.age || 18,
+              bio: data.bio || "",
+              media,
+              distance,
+              latitude: data.latitude,
+              longitude: data.longitude,
+              gender: data.gender,
+            },
+          ]);
+
+          setLoading(false);
+          return;
+        }
       }
 
       console.log("TOTAL LOADED USERS:", list.length);
-      setUsers(list);
+
+      const finalList = list.slice(0, 20);
+      console.log("TOTAL LOADED USERS:", finalList.length);
+      setUsers(finalList);
+      if (finalList.length === 0) {
+        console.log("NO MORE FRESH USERS FOUND");
+      }
+
+      // await AsyncStorage.setItem("home_profiles", JSON.stringify(finalList));
     } catch (error) {
       console.error("Error loading users:", error);
     } finally {
       setLoading(false);
     }
-  }, [myProfile, focusUserId]);
+  }, [myProfile?.gender, focusUserId]);
 
   // 🔥 EDIT YAHAN HAI: [loadUsers] ko hata kar khali [] kar diya hai
   useEffect(() => {
     if (!myProfile?.gender) return;
 
     loadUsers();
-  }, [loadUsers, myProfile?.gender]); // 👈 Isse data sirf ek baar screen khulne par load hoga, har swipe par nahi
+  }, [myProfile?.gender, focusUserId]);
+  useEffect(() => {
+    if (!limitReached) return;
+
+    const interval = setInterval(() => {
+      const now = new Date();
+
+      const tomorrow = new Date();
+      tomorrow.setHours(24, 0, 0, 0);
+
+      const diff = tomorrow.getTime() - now.getTime();
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setTimeLeft(`${hours}h ${mins}m ${secs}s`);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [limitReached]); // 👈 Isse data sirf ek baar screen khulne par load hoga, har swipe par nahi
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
@@ -208,6 +348,9 @@ export default function Home() {
         target = prev[0];
 
         const updated = prev.slice(1);
+        AsyncStorage.setItem("home_profiles", JSON.stringify(updated)).catch(
+          () => {},
+        );
 
         // 🔥 Focused user swipe hone ke baad normal home pe wapas
         if (focusUserId && target?.id === focusUserId) {
@@ -224,6 +367,23 @@ export default function Home() {
       // 2. Choti si deri (0ms) ke sath database ko background mein update hone do
       setTimeout(async () => {
         const myUid = auth.currentUser?.uid;
+
+        if (!myUid) return;
+
+        await updateDoc(doc(db, "users", myUid), {
+          dailyViews: increment(1),
+        });
+        const remainingUsers = users.length - 1;
+
+        if (remainingUsers <= 0) {
+          loadUsers();
+        }
+        const userSnap = await getDoc(doc(db, "users", myUid));
+        const userData = userSnap.data();
+
+        if ((userData?.dailyViews || 0) >= 20) {
+          setLimitReached(true);
+        }
         if (!target || !myUid) return;
 
         try {
@@ -327,7 +487,7 @@ export default function Home() {
         }
       }, 0);
     },
-    [myProfile, focusUserId], // 👈 Isme se 'users' hata diya hai taaki purane data ka conflict na ho
+    [myProfile?.gender, focusUserId], // 👈 Isme se 'users' hata diya hai taaki purane data ka conflict na ho
   );
 
   const handleUndo = () => {
@@ -352,7 +512,28 @@ export default function Home() {
   }
 
   const currentUser = users[0];
+  if (limitReached) {
+    return (
+      <IndoreBackground>
+        <View style={styles.center}>
+          <Text style={styles.emptyText}>Daily Limit Reached 🚀</Text>
 
+          <Text style={styles.emptySubtext}>Next 20 profiles available in</Text>
+
+          <Text
+            style={{
+              color: "#ff4d6d",
+              fontSize: 24,
+              fontWeight: "bold",
+              marginTop: 10,
+            }}
+          >
+            {timeLeft}
+          </Text>
+        </View>
+      </IndoreBackground>
+    );
+  }
   if (!currentUser) {
     return (
       <IndoreBackground>

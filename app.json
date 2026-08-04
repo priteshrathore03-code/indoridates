@@ -7,12 +7,14 @@
     "orientation": "portrait",
     "platforms": ["ios", "android", "web"],
     "jsEngine": "hermes",
-    "plugins": ["expo-router", "expo-web-browser"],
+    "plugins": ["expo-router", "expo-web-browser", "expo-font", "expo-audio"],
     "icon": "./assets/images/icon.png",
-
     "android": {
       "package": "com.indoridates.app2",
       "versionCode": 4,
+
+      "permissions": ["RECORD_AUDIO"],
+
       "googleServicesFile": "./google-services.json",
 
       "adaptiveIcon": {

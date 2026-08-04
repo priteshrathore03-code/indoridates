@@ -28,18 +28,20 @@ import {
   updatePlan,
 } from "../../data/planStore";
 
+import Slider from "@react-native-community/slider";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useUserProfile } from "../../data/userProfile";
-
+import { auth, db } from "../../firebaseConfig";
 import FadeWrapper from "../components/FadeWrapper";
 import IndoreBackground from "../components/IndoreBackground";
-
 export default function Todo() {
   const router = useRouter();
   const { user } = useUserProfile();
 
   const [plans, setPlans] = useState<PlanType[]>([]);
   const [showForm, setShowForm] = useState(false);
-
+  const [showRadius, setShowRadius] = useState(false);
+  const [radius, setRadius] = useState(250);
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("");
   const [brief, setBrief] = useState("");
@@ -86,7 +88,41 @@ export default function Todo() {
 
     return () => unsubscribe();
   }, []);
+  useEffect(() => {
+    const loadRadius = async () => {
+      if (!user?.uid) return;
 
+      const snap = await getDoc(doc(db, "users", user.uid));
+
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+
+      setRadius(data.searchRadius ?? 250);
+    };
+
+    loadRadius();
+  }, [user?.uid]);
+  const getDistanceKm = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ) => {
+    const R = 6371;
+
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  };
   if (!user) return null;
 
   const visiblePlans = plans.filter((plan) => {
@@ -106,7 +142,19 @@ export default function Todo() {
     if (!plan.visibleTo) {
       return true;
     }
+    // Distance Filter
+    if (plan.latitude && plan.longitude && user.latitude && user.longitude) {
+      const distance = getDistanceKm(
+        user.latitude,
+        user.longitude,
+        plan.latitude,
+        plan.longitude,
+      );
 
+      if (distance > radius) {
+        return false;
+      }
+    }
     // Plan visible to everyone
     if (plan.visibleTo === "everyone") {
       return true;
@@ -139,6 +187,8 @@ export default function Todo() {
       createdBy: user.uid,
       createdByName: user.name || "User",
       createdByPhoto: user.photos?.[0] || "",
+      latitude: user.latitude,
+      longitude: user.longitude,
 
       createdAt: Date.now(),
       requests: [],
@@ -146,6 +196,7 @@ export default function Todo() {
       status: "open",
       visibleTo,
     });
+    
 
     setTitle("");
     setTime("");
@@ -390,7 +441,57 @@ export default function Todo() {
               );
             })}
           </ScrollView>
+          {showRadius && (
+            <View style={styles.overlay}>
+              <View style={styles.radiusCard}>
+                <Text style={styles.formTitle}>Search Distance</Text>
 
+                <Text
+                  style={{
+                    color: "#FFD700",
+                    fontSize: 22,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                    marginBottom: 20,
+                  }}
+                >
+                  {radius} km
+                </Text>
+
+                <Slider
+                  minimumValue={20}
+                  maximumValue={250}
+                  step={5}
+                  value={radius}
+                  minimumTrackTintColor="#ff2d95"
+                  maximumTrackTintColor="#666"
+                  thumbTintColor="#fff"
+                  onValueChange={(value) => setRadius(value)}
+                />
+
+                <TouchableOpacity
+                  onPress={async () => {
+                    const uid = auth.currentUser?.uid;
+
+                    if (!uid) return;
+
+                    await updateDoc(doc(db, "users", uid), {
+                      searchRadius: radius,
+                    });
+
+                    setShowRadius(false);
+                  }}
+                >
+                  <LinearGradient
+                    colors={["#ffb347", "#ff416c", "#ff2d95"]}
+                    style={styles.saveBtn}
+                  >
+                    <Text style={styles.saveText}>Save</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
           {showForm && (
             <View style={styles.overlay}>
               <View style={styles.formCard}>
@@ -482,7 +583,23 @@ export default function Todo() {
               </View>
             </View>
           )}
-
+          <TouchableOpacity
+            style={styles.radiusBtnContainer}
+            onPress={() => setShowRadius(true)}
+          >
+            <LinearGradient
+              colors={["#3b82f6", "#2563eb"]}
+              style={styles.radiusBtn}
+            >
+              <Ionicons
+                name="location"
+                size={18}
+                color="#fff"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.radiusText}>{radius} km</Text>
+            </LinearGradient>
+          </TouchableOpacity>
           {!showForm && user.gender === "female" && !hasActivePlan && (
             <TouchableOpacity
               onPress={() => setShowForm(true)}
@@ -492,7 +609,15 @@ export default function Todo() {
                 colors={["#ffb347", "#ff416c", "#ff2d95"]}
                 style={styles.createBtn}
               >
-                <Text style={styles.createText}>+ Create New Plan</Text>
+                <>
+                  <Ionicons
+                    name="add"
+                    size={22}
+                    color="#fff"
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={styles.createText}>New Plan</Text>
+                </>
               </LinearGradient>
             </TouchableOpacity>
           )}
@@ -588,6 +713,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#333",
   },
+  radiusCard: {
+    width: "100%",
+    backgroundColor: "#1a1a1a",
+    borderRadius: 25,
+    padding: 25,
+    borderWidth: 1,
+    borderColor: "#333",
+  },
   formTitle: {
     fontSize: 26,
     color: "white",
@@ -613,18 +746,40 @@ const styles = StyleSheet.create({
   },
   saveText: { color: "white", fontWeight: "bold", fontSize: 18 },
   cancel: { textAlign: "center", color: "#888", marginTop: 15, fontSize: 16 },
+  radiusBtnContainer: {
+    position: "absolute",
+    bottom: 90,
+    right: 20,
+  },
+
+  radiusBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 48,
+    paddingHorizontal: 18,
+    borderRadius: 24,
+    elevation: 8,
+  },
+
+  radiusText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
+  },
   createBtnContainer: {
     position: "absolute",
-    top: "50%",
-    alignSelf: "center",
-    width: "80%",
+    bottom: 25,
+    right: 20,
   },
   createBtn: {
-    height: 60,
-    borderRadius: 30,
-    justifyContent: "center",
+    flexDirection: "row",
     alignItems: "center",
-    elevation: 5,
+    justifyContent: "center",
+    height: 56,
+    paddingHorizontal: 22,
+    borderRadius: 28,
+    elevation: 8,
   },
 
   emptyContainer: {

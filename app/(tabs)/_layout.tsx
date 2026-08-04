@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { auth, db } from "../../firebaseConfig";
 
-
 export default function TabsLayout() {
   const [plansCount, setPlansCount] = useState(0);
 
@@ -18,37 +17,33 @@ export default function TabsLayout() {
     return () => unsub();
   }, []);
   const [chatCount, setChatCount] = useState(0);
+  const [likesCount, setLikesCount] = useState(0);
 
   useEffect(() => {
     const myUid = auth.currentUser?.uid;
 
     if (!myUid) return;
 
-    let likesLength = 0;
-    let matchesLength = 0;
-
     const unsubLikes = onSnapshot(
       query(collection(db, "likes"), where("to", "==", myUid)),
       (snap) => {
-        likesLength = snap.docs.length;
-        setChatCount(likesLength + matchesLength);
+        setLikesCount(snap.docs.length);
       },
     );
 
-    const unsubMatches = onSnapshot(
+    const unsubChats = onSnapshot(
       query(
         collection(db, "chatRooms"),
         where("users", "array-contains", myUid),
       ),
       (snap) => {
-        matchesLength = snap.docs.length;
-        setChatCount(likesLength + matchesLength);
+        setChatCount(snap.docs.length);
       },
     );
 
     return () => {
       unsubLikes();
-      unsubMatches();
+      unsubChats();
     };
   }, []);
   return (
@@ -120,7 +115,44 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="likes"
+        options={{
+          title: "Likes",
+          tabBarIcon: ({ color, size }) => (
+            <View>
+              <Ionicons name="heart-outline" size={size} color={color} />
 
+              {likesCount > 0 && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: -5,
+                    right: -10,
+                    backgroundColor: "#ff2d95",
+                    borderRadius: 10,
+                    minWidth: 18,
+                    height: 18,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {likesCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
+        }}
+      />
       <Tabs.Screen
         name="chat"
         options={{

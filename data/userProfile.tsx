@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { stopPresence } from "../services/presenseService";
 
 import * as Location from "expo-location";
 
@@ -22,7 +23,10 @@ export type UserProfileState = {
   bio?: string;
   photos?: string[];
   video?: string | null;
-
+  verification?: {
+    status: "not_verified" | "verified";
+    verifiedAt?: number;
+  };
   latitude?: number;
   longitude?: number;
 
@@ -147,6 +151,12 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    const uid = auth.currentUser?.uid;
+
+    if (uid) {
+      await stopPresence(uid);
+    }
+
     await signOut(auth);
     setUser(null);
   };

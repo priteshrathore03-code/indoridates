@@ -1,6 +1,7 @@
 import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
 import { initializeApp } from "firebase/app";
 import { initializeAuth } from "firebase/auth";
+import { getDatabase } from "firebase/database";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -11,6 +12,8 @@ const firebaseConfig = {
   storageBucket: "indoridates.firebasestorage.app",
   messagingSenderId: "860588660053",
   appId: "1:860588660053:web:41e1b8bf2567681e8c4bdc",
+  databaseURL:
+    "https://indoridates-default-rtdb.asia-southeast1.firebasedatabase.app",
 };
 
 const app = initializeApp(firebaseConfig);
@@ -24,5 +27,6 @@ export const auth = initializeAuth(app, {
 
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export const rtdb = getDatabase(app);
 
 export default app;
